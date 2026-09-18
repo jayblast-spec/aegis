@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import Script from 'next/script'
 import './globals.css'
 import { SITE_URL } from '@/lib/site'
 import LucideLoader from './components/LucideLoader'
@@ -17,11 +16,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <Script id="tailwind-config" strategy="beforeInteractive">{`
-          window.tailwind = window.tailwind || {};
-          window.tailwind.config = { corePlugins: { preflight: false }, theme: { extend: { colors: { cyberBg: '#07090E' } } } };
-        `}</Script>
-        <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
         <LucideLoader />
         <style>{`.aegis-home a { text-decoration: none; color: inherit; }`}</style>
       </head>

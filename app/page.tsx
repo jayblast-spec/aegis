@@ -2,17 +2,34 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import type { Session } from '@supabase/supabase-js'
+import { supabase, type DelegationRow } from '@/lib/supabaseClient'
 import { SiteHeader, SiteFooter } from './components/SiteChrome'
 
-type AgentKey = 'openai' | 'gemini' | 'finagent'
+type AgentDef = { id: string; label: string; icon: string }
 type LogLine = { text: string; tone: 'muted' | 'ok' | 'warn' | 'danger' }
 type SimAction = { id: string; label: string; kind: 'standard' | 'financial' | 'malicious'; cost: string; desc: string }
 
-const agents: Record<AgentKey, { label: string; icon: string }> = {
-  openai: { label: 'OpenAI Operator', icon: 'bot' },
-  gemini: { label: 'Gemini Executive', icon: 'sparkles' },
-  finagent: { label: 'Autonomous Finance', icon: 'dollar-sign' },
-}
+// Known agentic AI products, kept broad on purpose. Add more here as new
+// agents ship, or use "Add another agent" in the sandbox UI to register one
+// at runtime — the selector, delegation, and kill-switch flow all work off
+// this list generically, with no per-agent code required either way.
+const defaultAgents: AgentDef[] = [
+  { id: 'openai-operator', label: 'OpenAI Operator / ChatGPT Agent', icon: 'bot' },
+  { id: 'gemini', label: 'Google Gemini', icon: 'sparkles' },
+  { id: 'claude', label: 'Anthropic Claude', icon: 'brain-circuit' },
+  { id: 'copilot', label: 'Microsoft Copilot', icon: 'layout-grid' },
+  { id: 'apple-intelligence', label: 'Apple Intelligence', icon: 'apple' },
+  { id: 'meta-ai', label: 'Meta AI', icon: 'infinity' },
+  { id: 'perplexity-comet', label: 'Perplexity Comet', icon: 'compass' },
+  { id: 'agentforce', label: 'Salesforce Agentforce', icon: 'building-2' },
+  { id: 'grok', label: 'xAI Grok', icon: 'zap' },
+  { id: 'amazon-alexa', label: 'Amazon Alexa+', icon: 'mic' },
+  { id: 'samsung-bixby', label: 'Samsung Bixby', icon: 'smartphone' },
+  { id: 'mistral-le-chat', label: 'Mistral Le Chat', icon: 'wind' },
+  { id: 'deepseek', label: 'DeepSeek', icon: 'waves' },
+  { id: 'finagent', label: 'Autonomous Finance Agent', icon: 'dollar-sign' },
+]
 
 const simActions: SimAction[] = [
   { id: 'sim-action-1', label: 'Draft Email to Client', kind: 'standard', cost: '$0.00', desc: 'Standard task, no spend, no restricted scope.' },
@@ -21,7 +38,10 @@ const simActions: SimAction[] = [
 ]
 
 export default function Home() {
-  const [agent, setAgent] = useState<AgentKey>('openai')
+  const [agentList, setAgentList] = useState<AgentDef[]>(defaultAgents)
+  const [agent, setAgent] = useState<string>(defaultAgents[0].id)
+  const [customAgentName, setCustomAgentName] = useState('')
+  const currentAgent = agentList.find(a => a.id === agent) ?? agentList[0]
   const [spending, setSpending] = useState(250)
   const [scopeEmail, setScopeEmail] = useState(true)
   const [scopeBank, setScopeBank] = useState(true)
@@ -33,11 +53,104 @@ export default function Home() {
   const [killed, setKilled] = useState(false)
   const [clock, setClock] = useState('')
 
+  const [session, setSession] = useState<Session | null>(null)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authStatus, setAuthStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [delegation, setDelegation] = useState<DelegationRow | null>(null)
+  const [delegationBusy, setDelegationBusy] = useState(false)
+
   useEffect(() => {
     setClock(new Date().toLocaleTimeString('en-US', { hour12: true }))
     const t = setInterval(() => setClock(new Date().toLocaleTimeString('en-US', { hour12: true })), 1000)
     return () => clearInterval(t)
   }, [])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!session) { setDelegation(null); return }
+    supabase
+      .from('delegations')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setDelegation(data as DelegationRow)
+          setKilled(data.status === 'revoked')
+        }
+      })
+  }, [session])
+
+  async function sendMagicLink() {
+    if (!authEmail) return
+    setAuthStatus('sending')
+    const { error } = await supabase.auth.signInWithOtp({
+      email: authEmail,
+      options: { emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
+    })
+    setAuthStatus(error ? 'error' : 'sent')
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    setDelegation(null)
+    setKilled(false)
+  }
+
+  async function saveRealDelegation() {
+    if (!session) return
+    setDelegationBusy(true)
+    const { data, error } = await supabase
+      .from('delegations')
+      .insert({
+        user_id: session.user.id,
+        agent_name: currentAgent.label,
+        scope_email: scopeEmail,
+        scope_bank: scopeBank,
+        scope_pii: scopePii,
+        spending_cap_cents: spending * 100,
+        approval_trigger_cents: approvalTrigger === 'always' ? 0 : Number(approvalTrigger) * 100,
+      })
+      .select()
+      .single()
+    setDelegationBusy(false)
+    if (!error && data) {
+      setDelegation(data as DelegationRow)
+      setKilled(false)
+      const t = timestamp()
+      setLog(l => [...l, { text: `[${t}] Real delegation saved to your account for ${currentAgent.label}. This persists across refresh.`, tone: 'ok' }])
+    }
+  }
+
+  async function revokeRealDelegation() {
+    if (!session || !delegation) return
+    setDelegationBusy(true)
+    const { error } = await supabase
+      .from('delegations')
+      .update({ status: 'revoked', revoked_at: new Date().toISOString() })
+      .eq('id', delegation.id)
+      .eq('user_id', session.user.id)
+    if (!error) {
+      await supabase.from('delegation_events').insert({
+        delegation_id: delegation.id,
+        user_id: session.user.id,
+        event_type: 'revoked',
+        detail: 'Revoked by user from sandbox kill switch',
+      })
+      setDelegation({ ...delegation, status: 'revoked', revoked_at: new Date().toISOString() })
+      setKilled(true)
+      const t = timestamp()
+      setLog(l => [...l, { text: `[${t}] REVOKED — your real delegation to ${delegation.agent_name} was updated in your account. This survives a refresh.`, tone: 'danger' }])
+    }
+    setDelegationBusy(false)
+  }
 
   function timestamp() {
     return new Date().toLocaleTimeString('en-US', { hour12: true })
@@ -46,7 +159,7 @@ export default function Home() {
   function runAction(action: SimAction) {
     const t = timestamp()
     if (action.kind === 'malicious') {
-      setLog(l => [...l, { text: `[${t}] ${agents[agent].label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] BLOCKED — request falls outside granted scope isolation.`, tone: 'danger' }])
+      setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] BLOCKED — request falls outside granted scope isolation.`, tone: 'danger' }])
       setBanner({ text: `Blocked: ${action.label}`, tone: 'danger' })
       setApproval({ open: false, desc: '' })
       return
@@ -54,16 +167,16 @@ export default function Home() {
     if (action.kind === 'financial') {
       const cost = 450
       if (cost > Number(approvalTrigger) || approvalTrigger === 'always') {
-        setLog(l => [...l, { text: `[${t}] ${agents[agent].label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] SUSPENDED — exceeds approval threshold ($${approvalTrigger === 'always' ? '0' : approvalTrigger}). Awaiting your decision.`, tone: 'warn' }])
+        setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] SUSPENDED — exceeds approval threshold ($${approvalTrigger === 'always' ? '0' : approvalTrigger}). Awaiting your decision.`, tone: 'warn' }])
         setBanner({ text: 'Awaiting mandatory approval...', tone: 'warn' })
         setApproval({ open: true, desc: `Agent requested a $${cost.toFixed(2)} transfer exceeding your threshold. Action suspended pending your decision.` })
         return
       }
-      setLog(l => [...l, { text: `[${t}] ${agents[agent].label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] ALLOWED — within daily limit ($${spending}/day).`, tone: 'ok' }])
+      setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] ALLOWED — within daily limit ($${spending}/day).`, tone: 'ok' }])
       setBanner({ text: `Allowed: ${action.label}`, tone: 'ok' })
       return
     }
-    setLog(l => [...l, { text: `[${t}] ${agents[agent].label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] ALLOWED — read/draft scope, no spend.`, tone: 'ok' }])
+    setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] ALLOWED — read/draft scope, no spend.`, tone: 'ok' }])
     setBanner({ text: `Allowed: ${action.label}`, tone: 'ok' })
   }
 
@@ -243,13 +356,36 @@ export default function Home() {
                 <div className="space-y-2">
                   <label className="text-xs text-gray-400 uppercase tracking-wider block" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Target AI agent</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(Object.keys(agents) as AgentKey[]).map(key => (
-                      <button key={key} onClick={() => setAgent(key)} className={`p-3 rounded-xl border text-xs flex flex-col items-center gap-2 text-center transition-all ${agent === key ? 'border-emerald-500/50 bg-emerald-500/10 text-white' : 'border-gray-800 bg-gray-900/60 text-gray-400 hover:border-gray-700'}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        <i data-lucide={agents[key].icon} className="w-5 h-5" />
-                        {agents[key].label}
+                    {agentList.map(a => (
+                      <button key={a.id} onClick={() => setAgent(a.id)} className={`p-3 rounded-xl border text-xs flex flex-col items-center gap-2 text-center transition-all ${agent === a.id ? 'border-emerald-500/50 bg-emerald-500/10 text-white' : 'border-gray-800 bg-gray-900/60 text-gray-400 hover:border-gray-700'}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        <i data-lucide={a.icon} className="w-5 h-5" />
+                        {a.label}
                       </button>
                     ))}
                   </div>
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={customAgentName}
+                      onChange={e => setCustomAgentName(e.target.value)}
+                      placeholder="Add another agent by name…"
+                      className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-emerald-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        const label = customAgentName.trim()
+                        if (!label) return
+                        const id = `custom-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`
+                        setAgentList(list => [...list, { id, label, icon: 'bot' }])
+                        setAgent(id)
+                        setCustomAgentName('')
+                      }}
+                      className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-800 text-gray-300 text-xs font-semibold hover:border-emerald-500/40 hover:text-emerald-300"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-500">Any agent can be targeted here — this list isn&rsquo;t hardcoded to a fixed set of providers, and any of them can be granted access and killed the same way.</p>
                 </div>
                 <div className="space-y-3 pt-2">
                   <div className="flex justify-between items-center text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
@@ -373,23 +509,56 @@ export default function Home() {
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <i data-lucide="file-check-2" className="w-3.5 h-3.5" /><span>ACTION LEDGER</span>
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Visible Receipts &amp; Instant Kill Switch</h2>
-                <p className="text-gray-300 text-base leading-relaxed">Every simulated action produces a timestamped, visible entry in the action ledger below. If an agent goes rogue in this demo, trigger the kill switch to revoke its authority instantly.</p>
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Visible Receipts &amp; a Kill Switch That Persists</h2>
+                <p className="text-gray-300 text-base leading-relaxed">Sign in below and every delegation you grant is a real, database-backed record tied to your account. Revoking it updates that record for good — it survives a refresh, and it stays revoked. Without signing in, the sandbox still runs, but only as a local browser demo.</p>
                 <div className="space-y-3 pt-2">
                   <div className="p-4 rounded-xl border border-gray-800 flex items-start gap-3" style={{ background: 'rgba(13,17,23,.75)' }}>
                     <i data-lucide="shield-alert" className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                    <div><h4 className="text-sm font-bold text-white">Revoke marks authority void</h4><p className="text-xs text-gray-400">This demo revoke updates the interface state immediately — it does not call any external provider.</p></div>
+                    <div><h4 className="text-sm font-bold text-white">Real revoke, honestly scoped</h4><p className="text-xs text-gray-400">Signed in, revoke really does mark your delegation record void in Aegis&rsquo;s database, protected by row-level security so only you can read or change it. It does not call OpenAI, Google, or any other provider&rsquo;s API — no such live integration exists yet.</p></div>
                   </div>
                   <div className="p-4 rounded-xl border border-gray-800 flex items-start gap-3" style={{ background: 'rgba(13,17,23,.75)' }}>
                     <i data-lucide="file-text" className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                     <div><h4 className="text-sm font-bold text-white">Plain, readable receipts</h4><p className="text-xs text-gray-400">Each entry records the agent, the action, the decision, and the time — no cryptographic signing is implemented in this build.</p></div>
                   </div>
                 </div>
-                <div className="pt-4">
-                  <button onClick={() => setKilled(k => !k)} className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase group ${killed ? 'bg-gray-800 text-gray-300' : 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50'}`}>
-                    <i data-lucide="power" className="w-5 h-5" />
-                    <span>{killed ? 'Restore Sandbox' : 'Trigger Kill Switch (Demo)'}</span>
-                  </button>
+                <div className="pt-4 space-y-3">
+                  {session ? (
+                    <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/60 text-xs text-gray-400 flex items-center justify-between" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span>Signed in as <span className="text-emerald-400">{session.user.email}</span></span>
+                      <button onClick={signOut} className="text-gray-500 hover:text-white">Sign out</button>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/60 space-y-2">
+                      <p className="text-xs text-gray-400">Sign in to make your delegation and kill switch real — persisted to your account, not just this browser tab.</p>
+                      <div className="flex gap-2">
+                        <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@email.com" className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-emerald-500 focus:outline-none" />
+                        <button onClick={sendMagicLink} disabled={authStatus === 'sending'} className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-50">
+                          {authStatus === 'sending' ? 'Sending…' : 'Send magic link'}
+                        </button>
+                      </div>
+                      {authStatus === 'sent' && <p className="text-[11px] text-emerald-400">Check your email for a sign-in link.</p>}
+                      {authStatus === 'error' && <p className="text-[11px] text-rose-400">Couldn&rsquo;t send the link — try again.</p>}
+                    </div>
+                  )}
+
+                  {session && delegation && delegation.status === 'active' && (
+                    <button onClick={revokeRealDelegation} disabled={delegationBusy} className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50 disabled:opacity-50">
+                      <i data-lucide="power" className="w-5 h-5" />
+                      <span>{delegationBusy ? 'Revoking…' : `Revoke Real Delegation (${delegation.agent_name})`}</span>
+                    </button>
+                  )}
+                  {session && (!delegation || delegation.status === 'revoked') && (
+                    <button onClick={saveRealDelegation} disabled={delegationBusy} className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase bg-gray-900 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50">
+                      <i data-lucide="shield-check" className="w-5 h-5" />
+                      <span>{delegationBusy ? 'Saving…' : `Grant Real Delegation to ${currentAgent.label}`}</span>
+                    </button>
+                  )}
+                  {!session && (
+                    <button onClick={() => setKilled(k => !k)} className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase group ${killed ? 'bg-gray-800 text-gray-300' : 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50'}`}>
+                      <i data-lucide="power" className="w-5 h-5" />
+                      <span>{killed ? 'Restore Sandbox (local only)' : 'Trigger Kill Switch (local demo — sign in above to make it real)'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="lg:col-span-7">
@@ -408,9 +577,17 @@ export default function Home() {
                   {killed && (
                     <div className="absolute inset-0 bg-rose-950/90 backdrop-blur-md p-8 flex flex-col items-center justify-center text-center space-y-4 z-20">
                       <div className="w-16 h-16 rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center"><i data-lucide="shield-off" className="w-8 h-8 text-rose-500" /></div>
-                      <h3 className="text-2xl font-extrabold text-white tracking-wider">SANDBOX LOCKED DOWN</h3>
-                      <p className="text-xs text-rose-200 max-w-md" style={{ fontFamily: "'JetBrains Mono', monospace" }}>This demo agent&rsquo;s authority has been marked void in the interface.</p>
-                      <button onClick={() => setKilled(false)} className="px-6 py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-gray-200 transition-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Restore Sandbox</button>
+                      <h3 className="text-2xl font-extrabold text-white tracking-wider">{session && delegation ? 'DELEGATION REVOKED' : 'SANDBOX LOCKED DOWN'}</h3>
+                      <p className="text-xs text-rose-200 max-w-md" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        {session && delegation
+                          ? 'This is permanent for this delegation record — it stays revoked even after a refresh. Grant a fresh delegation below to continue testing.'
+                          : "This demo agent's authority has been marked void in the interface."}
+                      </p>
+                      {session && delegation ? (
+                        <button onClick={saveRealDelegation} disabled={delegationBusy} className="px-6 py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-50" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{delegationBusy ? 'Saving…' : 'Grant New Delegation'}</button>
+                      ) : (
+                        <button onClick={() => setKilled(false)} className="px-6 py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-gray-200 transition-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Restore Sandbox</button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -480,10 +657,10 @@ export default function Home() {
                 <i data-lucide="play-circle" className="w-5 h-5" />
                 Launch Interactive Sandbox
               </a>
-              <a href="https://github.com/jayblast-spec/aegis" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gray-900/80 hover:bg-gray-800 border border-gray-700/80 text-gray-200 font-semibold hover:text-white transition-all flex items-center justify-center gap-3">
-                <i data-lucide="github" className="w-5 h-5" />
-                View Source on GitHub
-              </a>
+              <Link href="/compare" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gray-900/80 hover:bg-gray-800 border border-gray-700/80 text-gray-200 font-semibold hover:text-white transition-all flex items-center justify-center gap-3">
+                <i data-lucide="git-compare" className="w-5 h-5 text-cyan-400" />
+                Compare to Real Platforms
+              </Link>
             </div>
           </div>
         </section>

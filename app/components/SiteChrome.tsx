@@ -82,7 +82,6 @@ export function SiteFooter() {
             <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Governance</h4>
             <ul className="space-y-2 text-sm text-gray-400">
               <li><Link href="/compare" className="hover:text-emerald-400">Compare to Real Platforms</Link></li>
-              <li><a href="https://github.com/jayblast-spec/aegis" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400">Source Code</a></li>
             </ul>
           </div>
         </div>
