@@ -148,7 +148,7 @@ export default function Home() {
                   <span style={{ background: 'linear-gradient(135deg,#10B981 0%,#06B6D4 50%,#3B82F6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Boundaries for Every AI</span>
                 </h1>
                 <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto lg:mx-0 font-normal leading-relaxed">
-                  Aegis is a working design prototype of an independent trust layer between people and AI agents: portable access policies, spending limits, mandatory approval flows, and a one-click kill switch — modeled here as a live sandbox you can try right now.
+                  AI should feel liberating, not like handing your life to a black box. Aegis is a working design prototype for a human-first trust layer: your data stays in your control, sensitive actions wait for your approval, and every agent can be stopped in one click.
                 </p>
                 <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-xs text-gray-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <span className="text-gray-500 uppercase tracking-wider font-semibold mr-1">Modeled for:</span>
@@ -298,7 +298,7 @@ export default function Home() {
                   <div className="bg-black/80 rounded-xl p-4 border border-gray-800 text-xs space-y-3 min-h-[220px] flex flex-col justify-between overflow-hidden shadow-inner" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                     <div className="flex items-center justify-between border-b border-gray-800/80 pb-2 text-gray-500 text-[11px]">
                       <span>AEGIS SANDBOX LOG</span>
-                      <span>{timestamp()}</span>
+                      <span>{clock}</span>
                     </div>
                     <div className="space-y-2 text-gray-300 overflow-y-auto max-h-[160px] pr-2">
                       {log.map((l, i) => <div key={i} className={toneClass[l.tone]}>{l.text}</div>)}
