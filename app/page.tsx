@@ -86,12 +86,16 @@ export default function Home() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
-      <Script id="tailwind-config" strategy="beforeInteractive">{`
-        tailwind.config = { corePlugins: { preflight: false }, theme: { extend: { colors: { cyberBg: '#07090E' } } } };
-      `}</Script>
+      <Script
+        src="https://cdn.tailwindcss.com"
+        strategy="afterInteractive"
+        onLoad={() => {
+          ;(window as any).tailwind.config = { corePlugins: { preflight: false }, theme: { extend: { colors: { cyberBg: '#07090E' } } } }
+        }}
+      />
       <Script src="https://unpkg.com/lucide@latest" strategy="afterInteractive" onLoad={() => { (window as any).lucide?.createIcons?.() }} />
-      <div className="min-h-screen bg-[#07090E] text-gray-100 font-sans" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`.aegis-home a { text-decoration: none; }`}</style>
+      <div className="aegis-home min-h-screen bg-[#07090E] text-gray-100 font-sans" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="fixed inset-0 pointer-events-none opacity-60" style={{ backgroundImage: 'radial-gradient(rgba(16,185,129,.08) 1px, transparent 1px), radial-gradient(rgba(6,182,212,.05) 1px, transparent 1px)', backgroundSize: '32px 32px', backgroundPosition: '0 0, 16px 16px' }} />
 
         <header className="sticky top-0 z-50 w-full border-b border-gray-800/80 bg-[#07090E]/90 backdrop-blur-xl">
@@ -152,8 +156,18 @@ export default function Home() {
                 </p>
                 <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-xs text-gray-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <span className="text-gray-500 uppercase tracking-wider font-semibold mr-1">Modeled for:</span>
-                  {['OpenAI Operator', 'Google Gemini', 'Apple Intelligence', 'Meta Llama', 'Stripe & Plaid APIs'].map(v => (
-                    <span key={v} className="px-2.5 py-1 rounded-md bg-gray-900/90 border border-gray-800 text-gray-300">{v}</span>
+                  {[
+                    { label: 'OpenAI Operator', slug: null },
+                    { label: 'Google Gemini', slug: 'googlegemini' },
+                    { label: 'Apple Intelligence', slug: 'apple' },
+                    { label: 'Meta Llama', slug: 'meta' },
+                    { label: 'Stripe', slug: 'stripe' },
+                    { label: 'Plaid', slug: null },
+                  ].map(v => (
+                    <span key={v.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-900/90 border border-gray-800 text-gray-300">
+                      {v.slug && <img src={`https://cdn.simpleicons.org/${v.slug}/ffffff`} alt="" className="w-3.5 h-3.5 opacity-80" />}
+                      {v.label}
+                    </span>
                   ))}
                 </div>
                 <p className="text-[11px] text-gray-500">Conceptual cross-model architecture — no affiliation or current integration with these providers is implied.</p>
@@ -462,11 +476,53 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="border-t border-gray-800/80 py-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-2 text-gray-300"><i data-lucide="shield-check" className="w-4 h-4 text-emerald-400" />AEGIS</span>
-            <span>Your rules travel with you. No model owns your life.</span>
-            <span className="uppercase tracking-wider">Prototype · Local demo only</span>
+        <section className="py-24 border-t border-gray-800/80 relative overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-emerald-500/10 blur-[140px] rounded-full pointer-events-none" />
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6 relative">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">Protect Human Sovereignty in the Age of Autonomous AI</h2>
+            <p className="text-gray-300 text-lg">A prototype built for the institutions and developers who will need this once agents act on their behalf across rival platforms — try the sandbox yourself, no signup required.</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <a href="#sandbox" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 text-white font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+                <i data-lucide="play-circle" className="w-5 h-5" />
+                Launch Interactive Sandbox
+              </a>
+              <a href="https://github.com/jayblast-spec/aegis" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gray-900/80 hover:bg-gray-800 border border-gray-700/80 text-gray-200 font-semibold hover:text-white transition-all flex items-center justify-center gap-3">
+                <i data-lucide="github" className="w-5 h-5" />
+                View Source on GitHub
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <footer className="border-t border-gray-800/80 py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid md:grid-cols-4 gap-10 pb-10 border-b border-gray-800/80">
+              <div className="space-y-3 md:col-span-2 pr-8">
+                <span className="flex items-center gap-2 text-white font-bold text-lg" style={{ fontFamily: "'JetBrains Mono', monospace" }}><i data-lucide="shield-check" className="w-5 h-5 text-emerald-400" />AEGIS</span>
+                <p className="text-sm text-gray-400 max-w-sm">The neutral, portable trust and delegation layer enforcing spending caps, scope isolation, and universal kill switches for AI agents.</p>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Platform</h4>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li><a href="#platform" className="hover:text-emerald-400">Access Governance</a></li>
+                  <li><a href="#sandbox" className="hover:text-emerald-400">Policy Simulator</a></li>
+                  <li><a href="#receipt" className="hover:text-emerald-400">Universal Receipt</a></li>
+                  <li><a href="#neutral-advantage" className="hover:text-emerald-400">Rival Neutrality</a></li>
+                </ul>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Governance</h4>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li><Link href="/compare" className="hover:text-emerald-400">Compare to Real Platforms</Link></li>
+                  <li><a href="https://github.com/jayblast-spec/aegis" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400">Source Code</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
+              <span>© 2026 Aegis. A design prototype — not a registered entity or commercial product.</span>
+              <span className="text-center">Aegis is an independent, conceptual trust layer. All AI and platform trademarks belong to their respective owners.</span>
+              <span className="uppercase tracking-wider">Prototype · Local demo only</span>
+            </div>
           </div>
         </footer>
       </div>
