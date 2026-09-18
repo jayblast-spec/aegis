@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export function SiteHeader({ active }: { active?: 'platform' | 'sandbox' | 'receipt' | 'neutral-advantage' | 'compare' }) {
+export function SiteHeader({ active }: { active?: 'platform' | 'thesis' | 'sandbox' | 'receipt' | 'neutral-advantage' | 'compare' }) {
   const link = (key: string, cls = '') => `hover:text-emerald-400 transition-colors ${active === key ? 'text-emerald-400' : ''} ${cls}`
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-800/80 bg-[#07090E]/90 backdrop-blur-xl">
@@ -30,6 +30,7 @@ export function SiteHeader({ active }: { active?: 'platform' | 'sandbox' | 'rece
         </div>
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
           <Link href="/#platform" className={link('platform')}>Platform</Link>
+          <Link href="/#thesis" className={link('thesis')}>Thesis</Link>
           <Link href="/#sandbox" className={link('sandbox')}>Sandbox</Link>
           <Link href="/#receipt" className={link('receipt')}>Action Ledger</Link>
           <Link href="/#neutral-advantage" className={link('neutral-advantage')}>Neutrality</Link>
@@ -71,6 +72,7 @@ export function SiteFooter() {
             <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Platform</h4>
             <ul className="space-y-2 text-sm text-gray-400">
               <li><Link href="/#platform" className="hover:text-emerald-400">Access Governance</Link></li>
+              <li><Link href="/#thesis" className="hover:text-emerald-400">The Thesis</Link></li>
               <li><Link href="/#sandbox" className="hover:text-emerald-400">Policy Simulator</Link></li>
               <li><Link href="/#receipt" className="hover:text-emerald-400">Universal Receipt</Link></li>
               <li><Link href="/#neutral-advantage" className="hover:text-emerald-400">Rival Neutrality</Link></li>

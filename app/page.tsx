@@ -180,6 +180,49 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="thesis" className="py-24 border-y border-gray-800/80 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-500/10 blur-[140px] rounded-full pointer-events-none" />
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs mb-6" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              <span>WHY THIS HAS TO EXIST</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-6">Not another AI assistant. The trust layer every agent will need.</h2>
+            <p className="text-lg text-gray-300 leading-relaxed mb-4">
+              Aegis is designed to let a person set portable, enforceable boundaries for every AI they use — what it may access and do, spending and sharing limits, when approval is mandatory, and a universal action receipt with a revoke button and a kill switch.
+            </p>
+            <p className="text-lg text-gray-300 leading-relaxed mb-4">
+              As agents take on more of representing people — across assistants, phones, banks, and everyday apps — someone has to hold that boundary. A platform that also builds the agent has a structural conflict of interest in also being the referee over it. They can ship a better chatbot; they can&rsquo;t credibly own the neutral authority layer across their own rivals.
+            </p>
+            <p className="text-sm text-gray-500 mb-12">
+              Today this exists as a working sandbox, not a live integration with any provider below — see &ldquo;Modeled for&rdquo; above and the honest capability table in <Link href="/compare" className="text-emerald-400 hover:underline">/compare</Link>.
+            </p>
+
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6" style={{ fontFamily: "'JetBrains Mono', monospace" }}>The urgency is real</h3>
+            <div className="grid sm:grid-cols-2 gap-5">
+              <div className="p-6 rounded-2xl border border-gray-800" style={{ background: 'rgba(13,17,23,.75)' }}>
+                <div className="text-3xl font-extrabold text-emerald-400 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>57%</div>
+                <p className="text-sm text-gray-300 leading-relaxed">of consumers say data security and privacy would most increase their willingness to trust a personal AI assistant — ahead of transparency (48%) and human oversight (46%).</p>
+                <a href="https://www.zendesk.com/newsroom/press-releases/global-survey-reveals-growing-consumer-trust-in-personal-ai-assistants/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-emerald-400 mt-3 inline-block">Zendesk / YouGov, 2026 CX Trends Report →</a>
+              </div>
+              <div className="p-6 rounded-2xl border border-gray-800" style={{ background: 'rgba(13,17,23,.75)' }}>
+                <div className="text-3xl font-extrabold text-cyan-400 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>+63%</div>
+                <p className="text-sm text-gray-300 leading-relaxed">year-over-year rise in consumer demand for AI transparency — yet only 37% of organizations currently explain how their AI reaches a decision.</p>
+                <a href="https://www.zendesk.com/blog/zendesk-insights/expertise/cutting-through-the-noise-how-ai-transparency-is-changing-cx-for-good/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-emerald-400 mt-3 inline-block">Zendesk, 2026 CX Trends Report →</a>
+              </div>
+              <div className="p-6 rounded-2xl border border-gray-800" style={{ background: 'rgba(13,17,23,.75)' }}>
+                <div className="text-lg font-bold text-white mb-2">NIST AI RMF</div>
+                <p className="text-sm text-gray-300 leading-relaxed">names transparency, accountability, and human oversight matched to risk as core requirements for trustworthy AI — exactly the properties a delegation boundary is built to enforce.</p>
+                <a href="https://www.nist.gov/itl/ai-risk-management-framework" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-emerald-400 mt-3 inline-block">NIST AI Risk Management Framework →</a>
+              </div>
+              <div className="p-6 rounded-2xl border border-gray-800" style={{ background: 'rgba(13,17,23,.75)' }}>
+                <div className="text-lg font-bold text-white mb-2">&ldquo;Unlikely to ever be fully solved&rdquo;</div>
+                <p className="text-sm text-gray-300 leading-relaxed">is how OpenAI describes prompt injection for browser agents — malicious instructions hidden in ordinary web content that can hijack what an agent does next.</p>
+                <a href="https://openai.com/index/hardening-atlas-against-prompt-injection/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-emerald-400 mt-3 inline-block">OpenAI, hardening ChatGPT Atlas →</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="sandbox" className="py-20 border-y border-gray-800/80 relative" style={{ background: 'rgba(13,17,23,.6)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
