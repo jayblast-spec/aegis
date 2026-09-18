@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import Script from 'next/script'
+import { SiteHeader, SiteFooter } from './components/SiteChrome'
 
 type AgentKey = 'openai' | 'gemini' | 'finagent'
 type LogLine = { text: string; tone: 'muted' | 'ok' | 'warn' | 'danger' }
@@ -83,59 +83,10 @@ export default function Home() {
 
   return (
     <>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <Script
-        src="https://cdn.tailwindcss.com"
-        strategy="afterInteractive"
-        onLoad={() => {
-          ;(window as any).tailwind.config = { corePlugins: { preflight: false }, theme: { extend: { colors: { cyberBg: '#07090E' } } } }
-        }}
-      />
-      <Script src="https://unpkg.com/lucide@latest" strategy="afterInteractive" onLoad={() => { (window as any).lucide?.createIcons?.() }} />
-      <style>{`.aegis-home a { text-decoration: none; color: inherit; }`}</style>
       <div className="aegis-home min-h-screen bg-[#07090E] text-gray-100 font-sans" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="fixed inset-0 pointer-events-none opacity-60" style={{ backgroundImage: 'radial-gradient(rgba(16,185,129,.08) 1px, transparent 1px), radial-gradient(rgba(6,182,212,.05) 1px, transparent 1px)', backgroundSize: '32px 32px', backgroundPosition: '0 0, 16px 16px' }} />
 
-        <header className="sticky top-0 z-50 w-full border-b border-gray-800/80 bg-[#07090E]/90 backdrop-blur-xl">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="flex items-center gap-3 group">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-600 p-[1px] shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-all">
-                  <div className="w-full h-full bg-[#07090E] rounded-[11px] flex items-center justify-center">
-                    <i data-lucide="shield-check" className="w-5 h-5 text-emerald-400" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-xl tracking-tight text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AEGIS</span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">Protocol</span>
-                  </div>
-                  <span className="text-[11px] text-gray-400 hidden sm:block" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Independent Trust &amp; Delegation</span>
-                </div>
-              </Link>
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-gray-900/80 border border-gray-800 text-xs">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <span className="text-gray-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>SANDBOX: <span className="text-emerald-400 font-semibold">LIVE</span></span>
-              </div>
-            </div>
-            <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
-              <a href="#platform" className="hover:text-emerald-400 transition-colors">Platform</a>
-              <a href="#sandbox" className="hover:text-emerald-400 transition-colors">Sandbox</a>
-              <a href="#receipt" className="hover:text-emerald-400 transition-colors">Action Ledger</a>
-              <a href="#neutral-advantage" className="hover:text-emerald-400 transition-colors">Neutrality</a>
-              <Link href="/compare" className="hover:text-emerald-400 transition-colors">Compare</Link>
-            </nav>
-            <a href="#sandbox" className="relative group overflow-hidden rounded-xl p-[1px] font-semibold text-xs sm:text-sm">
-              <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600 opacity-80 group-hover:opacity-100 transition-all" />
-              <span className="relative px-4 py-2.5 rounded-[11px] bg-[#07090E] flex items-center gap-2 group-hover:bg-transparent text-white">Try the Sandbox</span>
-            </a>
-          </div>
-        </header>
+        <SiteHeader />
 
         <section className="relative pt-12 pb-24 md:pt-20 md:pb-32 overflow-hidden">
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 blur-[140px] rounded-full pointer-events-none" />
@@ -157,15 +108,15 @@ export default function Home() {
                 <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-xs text-gray-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <span className="text-gray-500 uppercase tracking-wider font-semibold mr-1">Modeled for:</span>
                   {[
-                    { label: 'OpenAI Operator', slug: null },
-                    { label: 'Google Gemini', slug: 'googlegemini' },
-                    { label: 'Apple Intelligence', slug: 'apple' },
-                    { label: 'Meta Llama', slug: 'meta' },
-                    { label: 'Stripe', slug: 'stripe' },
-                    { label: 'Plaid', slug: null },
+                    { label: 'OpenAI Operator', slug: null, color: null },
+                    { label: 'Google Gemini', slug: 'googlegemini', color: null },
+                    { label: 'Apple Intelligence', slug: 'apple', color: 'ffffff' },
+                    { label: 'Meta Llama', slug: 'meta', color: null },
+                    { label: 'Stripe', slug: 'stripe', color: null },
+                    { label: 'Plaid', slug: null, color: null },
                   ].map(v => (
                     <span key={v.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-900/90 border border-gray-800 text-gray-300">
-                      {v.slug && <img src={`https://cdn.simpleicons.org/${v.slug}/ffffff`} alt="" className="w-3.5 h-3.5 opacity-80" />}
+                      {v.slug && <img src={`https://cdn.simpleicons.org/${v.slug}${v.color ? '/' + v.color : ''}`} alt="" className="w-3.5 h-3.5" />}
                       {v.label}
                     </span>
                   ))}
@@ -494,51 +445,7 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="border-t border-gray-800/80 py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid md:grid-cols-4 gap-10 pb-10 border-b border-gray-800/80">
-              <div className="space-y-4 md:col-span-2 pr-8">
-                <span className="flex items-center gap-2 text-white font-bold text-lg" style={{ fontFamily: "'JetBrains Mono', monospace" }}><i data-lucide="shield-check" className="w-5 h-5 text-emerald-400" />AEGIS</span>
-                <p className="text-sm text-gray-400 max-w-sm">The neutral, portable trust and delegation layer enforcing spending caps, scope isolation, and universal kill switches for AI agents.</p>
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  {[
-                    { label: 'App Store', slug: 'apple' },
-                    { label: 'Google Play', slug: 'googleplay' },
-                  ].map(v => (
-                    <span key={v.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-900/80 border border-gray-800 text-gray-500 cursor-not-allowed">
-                      <img src={`https://cdn.simpleicons.org/${v.slug}/6B7280`} alt="" className="w-4 h-4" />
-                      <span className="flex flex-col leading-tight">
-                        <span className="text-[9px] uppercase tracking-wider text-gray-600" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Coming soon</span>
-                        <span className="text-xs font-semibold text-gray-400">{v.label}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Platform</h4>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li><a href="#platform" className="hover:text-emerald-400">Access Governance</a></li>
-                  <li><a href="#sandbox" className="hover:text-emerald-400">Policy Simulator</a></li>
-                  <li><a href="#receipt" className="hover:text-emerald-400">Universal Receipt</a></li>
-                  <li><a href="#neutral-advantage" className="hover:text-emerald-400">Rival Neutrality</a></li>
-                </ul>
-              </div>
-              <div className="space-y-3">
-                <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Governance</h4>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li><Link href="/compare" className="hover:text-emerald-400">Compare to Real Platforms</Link></li>
-                  <li><a href="https://github.com/jayblast-spec/aegis" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400">Source Code</a></li>
-                </ul>
-              </div>
-            </div>
-            <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-              <span>© 2026 Aegis. An early-stage concept — not a registered entity or commercial product.</span>
-              <span className="text-center">Aegis is an independent, conceptual trust layer. All AI and platform trademarks belong to their respective owners.</span>
-              <span className="uppercase tracking-wider">Early-stage protocol design</span>
-            </div>
-          </div>
-        </footer>
+        <SiteFooter />
       </div>
     </>
   )
