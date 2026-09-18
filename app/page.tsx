@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Script from 'next/script'
 
@@ -31,6 +31,13 @@ export default function Home() {
   const [banner, setBanner] = useState<{ text: string; tone: 'idle' | 'ok' | 'warn' | 'danger' }>({ text: 'Waiting for agent action...', tone: 'idle' })
   const [approval, setApproval] = useState<{ open: boolean; desc: string }>({ open: false, desc: '' })
   const [killed, setKilled] = useState(false)
+  const [clock, setClock] = useState('')
+
+  useEffect(() => {
+    setClock(new Date().toLocaleTimeString('en-US', { hour12: true }))
+    const t = setInterval(() => setClock(new Date().toLocaleTimeString('en-US', { hour12: true })), 1000)
+    return () => clearInterval(t)
+  }, [])
 
   function timestamp() {
     return new Date().toLocaleTimeString('en-US', { hour12: true })
@@ -408,10 +415,10 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                <i data-lucide="shield-alert" className="w-3.5 h-3.5" /><span>THE NEUTRALITY IDEA</span>
+                <i data-lucide="shield-alert" className="w-3.5 h-3.5" /><span>THE AEGIS PROTOCOL · FUTURE VISION</span>
               </div>
-              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">Why a Neutral Layer Matters</h2>
-              <p className="text-gray-300 text-base sm:text-lg">A platform that also builds the AI agent has a conflict of interest in also being the referee over it. That&rsquo;s the design premise here — not a claim about what exists today.</p>
+              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">The trust protocol agents will need.</h2>
+              <p className="text-gray-300 text-base sm:text-lg">Aegis imagines a future where every agent carries a human-readable mandate, receives only time-bound authority, emits a signed receipt, and can be revoked everywhere at once. Platforms build the intelligence; people keep the authority.</p>
             </div>
             <div className="rounded-3xl p-6 sm:p-8 border border-gray-800 overflow-x-auto" style={{ background: 'rgba(13,17,23,.75)', backdropFilter: 'blur(12px)' }}>
               <table className="w-full text-left border-collapse min-w-[640px]">
