@@ -8,7 +8,7 @@ import { SiteHeader, SiteFooter } from '../components/SiteChrome'
 export const metadata: Metadata = {
   title: 'Aegis vs. AI Agent Authorization Platforms — Comparisons',
   description:
-    'Honest, researched comparisons between Aegis, a prototype delegation card for personal AI agents, and adjacent agent identity and authorization platforms: Auth0 for AI Agents, Permit.io, Cerbos, Descope, and Oso.',
+    'Honest, researched comparisons between Aegis, a concept delegation card for personal AI agents, and adjacent agent identity and authorization platforms: Auth0 for AI Agents, Permit.io, Cerbos, Descope, and Oso.',
   alternates: { canonical: `${SITE_URL}/compare` },
   openGraph: {
     title: 'Aegis vs. AI Agent Authorization Platforms — Comparisons',

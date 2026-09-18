@@ -43,11 +43,11 @@ export const comparisons: Comparison[] = [
     rows: [
       { label: 'Who configures it', aegis: 'The end user, directly, in a browser', other: 'Developers, via SDKs and the Auth0 dashboard' },
       { label: 'Unit of control', aegis: 'A delegation card: task, data, actions, mode, hard limit, expiry', other: 'Agent identity, scoped token, short-lived credential' },
-      { label: 'Enforcement point', aegis: 'Prototype UI — approve/block is a local demo, not a runtime gate on a real agent', other: 'Runtime, at the API/MCP layer, backed by Auth0’s identity platform' },
+      { label: 'Enforcement point', aegis: 'Concept UI — approve/block is a local demo, not a runtime gate on a real agent', other: 'Runtime, at the API/MCP layer, backed by Auth0’s identity platform' },
       { label: 'Audit trail', aegis: 'An in-browser action ledger stored in localStorage', other: 'Production audit logs anchored to verified user identity' },
       { label: 'Deployment', aegis: 'Single-page local demo', other: 'Integrated into a live product via Auth0 SDKs' },
     ],
-    pricingAegis: 'Not a commercial product — this is a working prototype, currently free to try with no account required.',
+    pricingAegis: 'Not a commercial product — this is an early-stage concept, currently free to try with no account required.',
     pricingOther: 'Freemium: free to start building, then usage-based pricing as active agent identities scale (per Auth0’s own site).',
     freeAegis: 'Entirely free; runs locally in your browser.',
     freeOther: 'Yes — Auth0 advertises a free tier to start building before paying for active agent identities.',
@@ -63,7 +63,7 @@ export const comparisons: Comparison[] = [
       'Revoke and pause are one click, always visible',
     ],
     consAegis: [
-      'Prototype only: no real agent is actually gated by these cards yet',
+      'Concept only: no real agent is actually gated by these cards yet',
       'No cryptographic signing, encryption, or immutable logging — despite some UI copy, none of that is implemented',
       'Data lives in browser localStorage, not a durable backend',
     ],
@@ -78,9 +78,9 @@ export const comparisons: Comparison[] = [
       'Overhead is hard to justify for a single personal agent or a small project',
     ],
     verdict:
-      'These solve different problems. If you are a person who wants a visible, editable boundary on one or two personal agents today, Aegis’s card model is the more direct interface — with the honest caveat that it is a local prototype, not a security control. If you are a company shipping an AI agent or MCP server into production and need real identity, tokens, and audit trails, Auth0 for AI Agents is built for that job and Aegis is not a substitute for it.',
+      'These solve different problems. If you are a person who wants a visible, editable boundary on one or two personal agents today, Aegis’s card model is the more direct interface — with the honest caveat that it is a local concept build, not a security control. If you are a company shipping an AI agent or MCP server into production and need real identity, tokens, and audit trails, Auth0 for AI Agents is built for that job and Aegis is not a substitute for it.',
     faqs: [
-      { q: 'Is Aegis a replacement for Auth0 for AI Agents?', a: 'No. Aegis is a consumer-facing prototype for individuals to define and revoke boundaries on personal agents. Auth0 for AI Agents is production identity infrastructure for companies building agents and MCP servers. They serve different users and different stages of maturity.' },
+      { q: 'Is Aegis a replacement for Auth0 for AI Agents?', a: 'No. Aegis is a consumer-facing concept for individuals to define and revoke boundaries on personal agents. Auth0 for AI Agents is production identity infrastructure for companies building agents and MCP servers. They serve different users and different stages of maturity.' },
       { q: 'Does Aegis implement real cryptographic identity like Auth0?', a: 'No. Aegis does not implement cryptographic signing, token issuance, or encryption. It is a local, browser-based demo of what a human-controlled authority interface could look like.' },
       { q: 'Could a product use both?', a: 'Conceptually yes: Auth0 for AI Agents could secure the machine-to-machine identity and tokens, while a consumer-facing layer like Aegis’s card model could give the end user visibility and control over what that identity is allowed to do.' },
     ],
@@ -103,7 +103,7 @@ export const comparisons: Comparison[] = [
       { label: 'MCP support', aegis: 'Not applicable — no live agent connection', other: 'Dedicated MCP Gateway enforcing policy on every tool call' },
       { label: 'Audit', aegis: 'Local action ledger, browser-only', other: 'Comprehensive audit logging with decision traces' },
     ],
-    pricingAegis: 'Free prototype; no plans, seats, or billing.',
+    pricingAegis: 'Free concept; no plans, seats, or billing.',
     pricingOther: 'Pricing is disclosed on request via Permit.io’s site; no public flat rate is listed there.',
     freeAegis: 'Fully free, local demo.',
     freeOther: 'Permit.io’s site does not clearly state a self-serve free tier — check their current pricing page before assuming one.',
@@ -136,9 +136,9 @@ export const comparisons: Comparison[] = [
     verdict:
       'Permit.io is infrastructure for teams that need enforceable, centralized policy across humans, services, and agents — including live MCP tool-call governance. Aegis is a much simpler, human-facing sketch of what visible consent for one person’s agent could feel like. Treat them as adjacent, not competing: a team could plausibly use Permit.io underneath and something like Aegis’s card UI in front of it.',
     faqs: [
-      { q: 'Does Aegis use a policy engine like Permit.io’s PDP?', a: 'No. Aegis has no Policy Decision Point. Approvals and blocks in the current prototype are simulated in the browser for demonstration.' },
+      { q: 'Does Aegis use a policy engine like Permit.io’s PDP?', a: 'No. Aegis has no Policy Decision Point. Approvals and blocks in the current build are simulated in the browser for demonstration.' },
       { q: 'Is Permit.io meant for individual consumers?', a: 'No — it’s built for engineering and platform teams securing applications, APIs, and agents at the infrastructure level, not for an individual configuring their own personal agent.' },
-      { q: 'Which one enforces MCP tool-call restrictions today?', a: 'Permit.io, via its MCP Gateway. Aegis does not connect to a live MCP server or agent in its current prototype form.' },
+      { q: 'Which one enforces MCP tool-call restrictions today?', a: 'Permit.io, via its MCP Gateway. Aegis does not connect to a live MCP server or agent in its current build.' },
     ],
   },
   {
@@ -155,8 +155,8 @@ export const comparisons: Comparison[] = [
     rows: [
       { label: 'Policy language', aegis: 'Plain sentences typed by the user', other: 'Human-readable YAML supporting RBAC, ABAC, ReBAC, and PBAC' },
       { label: 'Decision latency', aegis: 'Not applicable — no real-time decisions are made', other: 'Sub-millisecond decisions from a locally deployed Policy Decision Point' },
-      { label: 'Open source option', aegis: 'The prototype itself is not published as open source', other: 'The Cerbos PDP is open-source; Cerbos Hub adds a free management tier' },
-      { label: 'Compliance posture', aegis: 'None claimed — explicitly a prototype', other: 'Audit trails positioned for ISO 27001, SOC 2, and HIPAA contexts (per Cerbos’s site)' },
+      { label: 'Open source option', aegis: 'This build itself is not published as open source', other: 'The Cerbos PDP is open-source; Cerbos Hub adds a free management tier' },
+      { label: 'Compliance posture', aegis: 'None claimed — explicitly a concept build', other: 'Audit trails positioned for ISO 27001, SOC 2, and HIPAA contexts (per Cerbos’s site)' },
       { label: 'Deployment options', aegis: 'Single browser tab', other: 'Self-hosted, serverless, sidecar, or air-gapped' },
     ],
     pricingAegis: 'Free, with no tiers — it’s a demo, not a product.',
@@ -190,7 +190,7 @@ export const comparisons: Comparison[] = [
       'Value shows up at the system level, not for a single personal agent',
     ],
     verdict:
-      'Cerbos is a serious, open-source-backed authorization engine for teams that need fast, testable, centralized decisions — including for AI workloads. Aegis does not compete with that; it is a prototype exploring what a human, not a developer, would want to see and control about their own agent. If you need real enforcement today, Cerbos is the applicable tool.',
+      'Cerbos is a serious, open-source-backed authorization engine for teams that need fast, testable, centralized decisions — including for AI workloads. Aegis does not compete with that; it is a concept exploring what a human, not a developer, would want to see and control about their own agent. If you need real enforcement today, Cerbos is the applicable tool.',
     faqs: [
       { q: 'Can Aegis replace a Cerbos PDP?', a: 'No. Aegis makes no real-time authorization decisions. Cerbos’s PDP evaluates real requests in production; Aegis simulates approve/block in a local browser demo.' },
       { q: 'Is Cerbos free to use?', a: 'The Cerbos Policy Decision Point is open-source, and Cerbos Hub offers a free tier for policy management, per Cerbos’s own site.' },
@@ -215,7 +215,7 @@ export const comparisons: Comparison[] = [
       { label: 'Auth methods', aegis: 'None — there is no login system', other: 'Passkeys, magic links, OTP, biometrics, social login, SAML/OIDC SSO' },
       { label: 'Scope', aegis: 'Single individual, single browser', other: 'Enterprise and mid-market, B2C to B2B, multi-tenant' },
     ],
-    pricingAegis: 'Free prototype, no pricing tiers.',
+    pricingAegis: 'Free concept, no pricing tiers.',
     pricingOther: 'Not published on the marketing page; Descope’s site does not state specific tier pricing.',
     freeAegis: 'Free to use as a local demo.',
     freeOther: 'Not clearly stated on Descope’s site — verify current tiers on their pricing page before assuming a free plan.',
@@ -271,7 +271,7 @@ export const comparisons: Comparison[] = [
       { label: 'Reporting', aegis: 'A local, browser-only action list', other: 'Compliance logs and audit trails built for incident investigation' },
       { label: 'Integration', aegis: 'None', other: 'Integrates with Claude, ChatGPT, and other LLM providers (per Oso’s site)' },
     ],
-    pricingAegis: 'Free prototype; nothing to buy.',
+    pricingAegis: 'Free concept; nothing to buy.',
     pricingOther: 'Not itemized on the public site; Oso offers a free trial and an option to consult with their engineering team.',
     freeAegis: 'Yes, fully free.',
     freeOther: 'A free trial is offered, per Oso’s site; ongoing pricing is not publicly itemized.',
@@ -306,7 +306,7 @@ export const comparisons: Comparison[] = [
     faqs: [
       { q: 'Does Aegis detect agents I didn’t know were running, like Oso does?', a: 'No. Aegis has no discovery or monitoring capability. It only manages a boundary for an agent the user explicitly adds themselves.' },
       { q: 'Is Oso meant for individual consumers?', a: 'No — Oso is built for enterprise security and platform teams governing agent use across an organization, not for a single person’s personal agent.' },
-      { q: 'Which one would catch a misbehaving agent already in production?', a: 'Oso, via its monitoring and detection features. Aegis has no runtime enforcement or monitoring in its current prototype form.' },
+      { q: 'Which one would catch a misbehaving agent already in production?', a: 'Oso, via its monitoring and detection features. Aegis has no runtime enforcement or monitoring in its current build.' },
     ],
   },
 ]
