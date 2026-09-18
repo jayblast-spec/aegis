@@ -94,7 +94,7 @@ export default function Home() {
         }}
       />
       <Script src="https://unpkg.com/lucide@latest" strategy="afterInteractive" onLoad={() => { (window as any).lucide?.createIcons?.() }} />
-      <style>{`.aegis-home a { text-decoration: none; }`}</style>
+      <style>{`.aegis-home a { text-decoration: none; color: inherit; }`}</style>
       <div className="aegis-home min-h-screen bg-[#07090E] text-gray-100 font-sans" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="fixed inset-0 pointer-events-none opacity-60" style={{ backgroundImage: 'radial-gradient(rgba(16,185,129,.08) 1px, transparent 1px), radial-gradient(rgba(6,182,212,.05) 1px, transparent 1px)', backgroundSize: '32px 32px', backgroundPosition: '0 0, 16px 16px' }} />
 
@@ -110,7 +110,7 @@ export default function Home() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-xl tracking-tight text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AEGIS</span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">Prototype</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">Protocol</span>
                   </div>
                   <span className="text-[11px] text-gray-400 hidden sm:block" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Independent Trust &amp; Delegation</span>
                 </div>
@@ -120,7 +120,7 @@ export default function Home() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-                <span className="text-gray-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>DEMO MODE: <span className="text-emerald-400 font-semibold">RUNNING LOCALLY</span></span>
+                <span className="text-gray-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>SANDBOX: <span className="text-emerald-400 font-semibold">LIVE</span></span>
               </div>
             </div>
             <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
@@ -145,14 +145,14 @@ export default function Home() {
               <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <i data-lucide="shield" className="w-3.5 h-3.5" />
-                  <span>NEUTRAL AUTHORITY LAYER FOR AGENTIC AI — PROTOTYPE</span>
+                  <span>NEUTRAL AUTHORITY LAYER FOR AGENTIC AI — PROTOCOL</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
                   Set Portable, Enforceable <br className="hidden sm:block" />
                   <span style={{ background: 'linear-gradient(135deg,#10B981 0%,#06B6D4 50%,#3B82F6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Boundaries for Every AI</span>
                 </h1>
                 <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto lg:mx-0 font-normal leading-relaxed">
-                  AI should feel liberating, not like handing your life to a black box. Aegis is a working design prototype for a human-first trust layer: your data stays in your control, sensitive actions wait for your approval, and every agent can be stopped in one click.
+                  AI should feel liberating, not like handing your life to a black box. Aegis is an early build of a human-first trust protocol: your data stays in your control, sensitive actions wait for your approval, and every agent can be stopped in one click.
                 </p>
                 <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-xs text-gray-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <span className="text-gray-500 uppercase tracking-wider font-semibold mr-1">Modeled for:</span>
@@ -183,7 +183,7 @@ export default function Home() {
                 </div>
                 <div className="pt-8 border-t border-gray-800/80 grid grid-cols-3 gap-4 text-center lg:text-left">
                   <div>
-                    <div className="text-2xl font-bold text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Prototype</div>
+                    <div className="text-2xl font-bold text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Protocol</div>
                     <div className="text-xs text-gray-400">Not yet production security</div>
                   </div>
                   <div>
@@ -388,7 +388,7 @@ export default function Home() {
                   </div>
                   <div className="p-4 rounded-xl border border-gray-800 flex items-start gap-3" style={{ background: 'rgba(13,17,23,.75)' }}>
                     <i data-lucide="file-text" className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-                    <div><h4 className="text-sm font-bold text-white">Plain, readable receipts</h4><p className="text-xs text-gray-400">Each entry records the agent, the action, the decision, and the time — no cryptographic signing is implemented in this prototype.</p></div>
+                    <div><h4 className="text-sm font-bold text-white">Plain, readable receipts</h4><p className="text-xs text-gray-400">Each entry records the agent, the action, the decision, and the time — no cryptographic signing is implemented in this build.</p></div>
                   </div>
                 </div>
                 <div className="pt-4">
@@ -441,7 +441,7 @@ export default function Home() {
                     <th className="py-4 px-4">Governance vector</th>
                     <th className="py-4 px-4">OpenAI / tech silos</th>
                     <th className="py-4 px-4">Big tech OS (Apple/Google)</th>
-                    <th className="py-4 px-4 text-emerald-400 bg-emerald-500/5 rounded-t-xl font-bold">Aegis model (prototype)</th>
+                    <th className="py-4 px-4 text-emerald-400 bg-emerald-500/5 rounded-t-xl font-bold">Aegis model (concept)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/60 text-sm">
@@ -461,7 +461,7 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
-            <p className="text-center text-xs text-gray-500 mt-6" style={{ fontFamily: "'JetBrains Mono', monospace" }}>This table describes design intent for a prototype, not certified or audited capabilities of any listed company&rsquo;s products.</p>
+            <p className="text-center text-xs text-gray-500 mt-6" style={{ fontFamily: "'JetBrains Mono', monospace" }}>This table describes design intent for this concept, not certified or audited capabilities of any listed company&rsquo;s products.</p>
           </div>
         </section>
 
@@ -480,7 +480,7 @@ export default function Home() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-emerald-500/10 blur-[140px] rounded-full pointer-events-none" />
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6 relative">
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">Protect Human Sovereignty in the Age of Autonomous AI</h2>
-            <p className="text-gray-300 text-lg">A prototype built for the institutions and developers who will need this once agents act on their behalf across rival platforms — try the sandbox yourself, no signup required.</p>
+            <p className="text-gray-300 text-lg">A protocol concept built for the institutions and developers who will need this once agents act on their behalf across rival platforms — try the sandbox yourself, no signup required.</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <a href="#sandbox" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 text-white font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
                 <i data-lucide="play-circle" className="w-5 h-5" />
@@ -497,9 +497,23 @@ export default function Home() {
         <footer className="border-t border-gray-800/80 py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-4 gap-10 pb-10 border-b border-gray-800/80">
-              <div className="space-y-3 md:col-span-2 pr-8">
+              <div className="space-y-4 md:col-span-2 pr-8">
                 <span className="flex items-center gap-2 text-white font-bold text-lg" style={{ fontFamily: "'JetBrains Mono', monospace" }}><i data-lucide="shield-check" className="w-5 h-5 text-emerald-400" />AEGIS</span>
                 <p className="text-sm text-gray-400 max-w-sm">The neutral, portable trust and delegation layer enforcing spending caps, scope isolation, and universal kill switches for AI agents.</p>
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  {[
+                    { label: 'App Store', slug: 'apple' },
+                    { label: 'Google Play', slug: 'googleplay' },
+                  ].map(v => (
+                    <span key={v.label} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-900/80 border border-gray-800 text-gray-500 cursor-not-allowed">
+                      <img src={`https://cdn.simpleicons.org/${v.slug}/6B7280`} alt="" className="w-4 h-4" />
+                      <span className="flex flex-col leading-tight">
+                        <span className="text-[9px] uppercase tracking-wider text-gray-600" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Coming soon</span>
+                        <span className="text-xs font-semibold text-gray-400">{v.label}</span>
+                      </span>
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="space-y-3">
                 <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Platform</h4>
@@ -519,9 +533,9 @@ export default function Home() {
               </div>
             </div>
             <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-              <span>© 2026 Aegis. A design prototype — not a registered entity or commercial product.</span>
+              <span>© 2026 Aegis. An early-stage concept — not a registered entity or commercial product.</span>
               <span className="text-center">Aegis is an independent, conceptual trust layer. All AI and platform trademarks belong to their respective owners.</span>
-              <span className="uppercase tracking-wider">Prototype · Local demo only</span>
+              <span className="uppercase tracking-wider">Early-stage protocol design</span>
             </div>
           </div>
         </footer>
