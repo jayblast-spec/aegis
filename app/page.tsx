@@ -422,6 +422,10 @@ export default function Home() {
                     <option value="always">Require approval for all actions</option>
                   </select>
                 </div>
+                <div className="flex items-center gap-2 pt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  <i data-lucide="check-circle-2" className="w-3.5 h-3.5 shrink-0" />
+                  <span>Boundaries set for {currentAgent.label}: ${spending}/day · {[scopeEmail && 'email', scopeBank && 'bank', scopePii && 'PII'].filter(Boolean).join('+') || 'no scope'} · approval {approvalTrigger === 'always' ? 'on every action' : `over $${approvalTrigger}`}</span>
+                </div>
               </div>
 
               <div className="lg:col-span-7 space-y-6">
