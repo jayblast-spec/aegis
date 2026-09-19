@@ -54,9 +54,22 @@ export default function Home() {
   const [customAgentName, setCustomAgentName] = useState('')
   const currentAgent = agentList.find(a => a.id === agent) ?? agentList[0]
   const [spending, setSpending] = useState(250)
-  const [scopeEmail, setScopeEmail] = useState(true)
-  const [scopeBank, setScopeBank] = useState(true)
-  const [scopePii, setScopePii] = useState(false)
+  const [scopes, setScopes] = useState({
+    email_read: true,
+    email_send: false,
+    calendar_read: true,
+    calendar_write: false,
+    drive_read: true,
+    drive_write: false,
+    banking_read: true,
+    banking_transfer: false,
+    analytics_read: true,
+    analytics_modify: false,
+    customer_data_view: true,
+    customer_data_export: false,
+    payment_processing: false,
+    vendor_apis_read: true,
+  })
   const [approvalTrigger, setApprovalTrigger] = useState('100')
   const [log, setLog] = useState<LogLine[]>([{ text: '// System ready. Click any action above to test the policy simulator...', tone: 'muted' }])
   const [banner, setBanner] = useState<{ text: string; tone: 'idle' | 'ok' | 'warn' | 'danger' }>({ text: 'Waiting for agent action...', tone: 'idle' })
@@ -447,20 +460,79 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="space-y-3 pt-2">
-                  <label className="text-xs text-gray-400 uppercase tracking-wider block" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Permitted scope isolation</label>
-                  <div className="space-y-2">
-                    <label className="flex items-center justify-between p-3 rounded-xl bg-gray-900/80 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
-                      <span className="flex items-center gap-2 text-sm text-gray-200"><i data-lucide="mail" className="w-4 h-4 text-cyan-400" />Email read/draft only</span>
-                      <input type="checkbox" checked={scopeEmail} onChange={e => setScopeEmail(e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
-                    </label>
-                    <label className="flex items-center justify-between p-3 rounded-xl bg-gray-900/80 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
-                      <span className="flex items-center gap-2 text-sm text-gray-200"><i data-lucide="credit-card" className="w-4 h-4 text-emerald-400" />Bank wire / transfer API</span>
-                      <input type="checkbox" checked={scopeBank} onChange={e => setScopeBank(e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
-                    </label>
-                    <label className="flex items-center justify-between p-3 rounded-xl bg-gray-900/80 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
-                      <span className="flex items-center gap-2 text-sm text-gray-200"><i data-lucide="database" className="w-4 h-4 text-purple-400" />Export PII / customer data</span>
-                      <input type="checkbox" checked={scopePii} onChange={e => setScopePii(e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
-                    </label>
+                  <label className="text-xs text-gray-400 uppercase tracking-wider block mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Permitted scope isolation</label>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase px-2">Communication</div>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="mail" className="w-3.5 h-3.5 text-cyan-400" />Email read</span>
+                        <input type="checkbox" checked={scopes.email_read} onChange={e => setScopes({...scopes, email_read: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="send" className="w-3.5 h-3.5 text-amber-400" />Email send</span>
+                        <input type="checkbox" checked={scopes.email_send} onChange={e => setScopes({...scopes, email_send: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="calendar" className="w-3.5 h-3.5 text-blue-400" />Calendar read</span>
+                        <input type="checkbox" checked={scopes.calendar_read} onChange={e => setScopes({...scopes, calendar_read: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="calendar-plus" className="w-3.5 h-3.5 text-purple-400" />Calendar write</span>
+                        <input type="checkbox" checked={scopes.calendar_write} onChange={e => setScopes({...scopes, calendar_write: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase px-2">Storage & Files</div>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="folder" className="w-3.5 h-3.5 text-emerald-400" />Drive read</span>
+                        <input type="checkbox" checked={scopes.drive_read} onChange={e => setScopes({...scopes, drive_read: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="file-plus" className="w-3.5 h-3.5 text-red-400" />Drive write</span>
+                        <input type="checkbox" checked={scopes.drive_write} onChange={e => setScopes({...scopes, drive_write: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase px-2">Finance & Transactions</div>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="eye" className="w-3.5 h-3.5 text-cyan-400" />Banking read</span>
+                        <input type="checkbox" checked={scopes.banking_read} onChange={e => setScopes({...scopes, banking_read: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="credit-card" className="w-3.5 h-3.5 text-rose-400" />Banking transfer</span>
+                        <input type="checkbox" checked={scopes.banking_transfer} onChange={e => setScopes({...scopes, banking_transfer: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="zap" className="w-3.5 h-3.5 text-amber-400" />Payment processing</span>
+                        <input type="checkbox" checked={scopes.payment_processing} onChange={e => setScopes({...scopes, payment_processing: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase px-2">Analytics & Insights</div>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="bar-chart-2" className="w-3.5 h-3.5 text-blue-400" />Analytics read</span>
+                        <input type="checkbox" checked={scopes.analytics_read} onChange={e => setScopes({...scopes, analytics_read: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="sliders" className="w-3.5 h-3.5 text-purple-400" />Analytics modify</span>
+                        <input type="checkbox" checked={scopes.analytics_modify} onChange={e => setScopes({...scopes, analytics_modify: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase px-2">Sensitive Data</div>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="users" className="w-3.5 h-3.5 text-emerald-400" />Customer data view</span>
+                        <input type="checkbox" checked={scopes.customer_data_view} onChange={e => setScopes({...scopes, customer_data_view: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="download" className="w-3.5 h-3.5 text-rose-400" />Customer data export</span>
+                        <input type="checkbox" checked={scopes.customer_data_export} onChange={e => setScopes({...scopes, customer_data_export: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                      <label className="flex items-center justify-between p-2.5 rounded-lg bg-gray-900/50 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all">
+                        <span className="flex items-center gap-2 text-xs text-gray-300"><i data-lucide="lock" className="w-3.5 h-3.5 text-purple-400" />Vendor APIs read</span>
+                        <input type="checkbox" checked={scopes.vendor_apis_read} onChange={e => setScopes({...scopes, vendor_apis_read: e.target.checked})} className="w-3.5 h-3.5 rounded accent-emerald-500" />
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2 pt-2">
@@ -473,7 +545,7 @@ export default function Home() {
                 </div>
                 <div className="flex items-center gap-2 pt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <i data-lucide="check-circle-2" className="w-3.5 h-3.5 shrink-0" />
-                  <span>Boundaries set for {currentAgent.label}: ${spending}/day · {[scopeEmail && 'email', scopeBank && 'bank', scopePii && 'PII'].filter(Boolean).join('+') || 'no scope'} · approval {approvalTrigger === 'always' ? 'on every action' : `over $${approvalTrigger}`}</span>
+                  <span className="overflow-hidden text-ellipsis">Boundaries set for {currentAgent.label}: ${spending}/day · {Object.entries(scopes).filter(([_, v]) => v).length} scope{Object.entries(scopes).filter(([_, v]) => v).length !== 1 ? 's' : ''} · approval {approvalTrigger === 'always' ? 'on every action' : `over $${approvalTrigger}`}</span>
                 </div>
               </div>
 
