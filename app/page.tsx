@@ -4,7 +4,18 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, type DelegationRow } from '@/lib/supabaseClient'
+import { OAUTH_PROVIDERS, buildOAuthAuthUrl } from '@/lib/oauthProviders'
 import { SiteHeader, SiteFooter } from './components/SiteChrome'
+
+type OAuthConnectionRow = {
+  id: string
+  provider: string
+  account_email: string | null
+  scope: string
+  status: 'active' | 'revoked'
+  created_at: string
+  revoked_at: string | null
+}
 
 type AgentDef = { id: string; label: string; icon: string }
 type LogLine = { text: string; tone: 'muted' | 'ok' | 'warn' | 'danger' }
@@ -58,6 +69,8 @@ export default function Home() {
   const [authStatus, setAuthStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [delegation, setDelegation] = useState<DelegationRow | null>(null)
   const [delegationBusy, setDelegationBusy] = useState(false)
+  const [oauthConnections, setOauthConnections] = useState<OAuthConnectionRow[]>([])
+  const [oauthBusyProvider, setOauthBusyProvider] = useState<string | null>(null)
 
   useEffect(() => {
     setClock(new Date().toLocaleTimeString('en-US', { hour12: true }))
@@ -87,6 +100,42 @@ export default function Home() {
         }
       })
   }, [session])
+
+  useEffect(() => {
+    if (!session) { setOauthConnections([]); return }
+    supabase
+      .from('oauth_connections')
+      .select('id, provider, account_email, scope, status, created_at, revoked_at')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setOauthConnections((data as OAuthConnectionRow[]) ?? []))
+  }, [session])
+
+  function connectionFor(providerId: string) {
+    return oauthConnections.find(c => c.provider === providerId && c.status === 'active') ?? null
+  }
+
+  function connectRealAccount(providerId: string) {
+    if (typeof window === 'undefined') return
+    window.location.href = buildOAuthAuthUrl(providerId, window.location.origin)
+  }
+
+  async function revokeRealConnection(connectionId: string, providerLabel: string) {
+    if (!session) return
+    setOauthBusyProvider(connectionId)
+    const res = await fetch('/api/oauth/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ connectionId }),
+    })
+    const json = await res.json()
+    setOauthBusyProvider(null)
+    if (res.ok) {
+      setOauthConnections(list => list.map(c => c.id === connectionId ? { ...c, status: 'revoked', revoked_at: new Date().toISOString() } : c))
+      const t = timestamp()
+      setLog(l => [...l, { text: `[${t}] REVOKED — ${providerLabel}'s own OAuth server invalidated the token${json.providerRevokeOk ? '' : ' (local record updated; provider call did not confirm)'}. This is a real, independently checkable revoke.`, tone: 'danger' }])
+    }
+  }
 
   async function sendMagicLink() {
     if (!authEmail) return
@@ -562,6 +611,47 @@ export default function Home() {
                       <i data-lucide="power" className="w-5 h-5" />
                       <span>{killed ? 'Restore Sandbox (local only)' : 'Trigger Kill Switch (local demo — sign in above to make it real)'}</span>
                     </button>
+                  )}
+
+                  {session && (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>REAL CONNECTIONS — each of these calls a real provider&rsquo;s OAuth server, not just Aegis&rsquo;s own database. More providers plug into this same list over time.</p>
+                      {Object.values(OAUTH_PROVIDERS).map(provider => {
+                        const revokedConnection = oauthConnections.find(c => c.provider === provider.id && c.status === 'revoked')
+                        const active = connectionFor(provider.id)
+                        const busy = oauthBusyProvider === active?.id
+                        return (
+                          <div key={provider.id} className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 space-y-3">
+                            <div className="flex items-center gap-2 text-xs text-cyan-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                              <i data-lucide={provider.icon} className="w-4 h-4" />
+                              <span>{provider.label}</span>
+                            </div>
+                            {active ? (
+                              <>
+                                <p className="text-xs text-gray-400">Connected as <span className="text-white">{active.account_email ?? 'your account'}</span>. Revoking below calls the real OAuth revoke endpoint — independently verifiable, not just a database flag.</p>
+                                <button onClick={() => revokeRealConnection(active.id, provider.label)} disabled={busy} className="w-full py-3 px-6 rounded-xl font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-rose-600 to-red-700 text-white disabled:opacity-50">
+                                  {busy ? 'Revoking…' : `Revoke Real ${provider.label} Access`}
+                                </button>
+                              </>
+                            ) : revokedConnection ? (
+                              <>
+                                <p className="text-xs text-emerald-400">Revoked — this connection has been cut off for good. Connect again to test another round.</p>
+                                <button onClick={() => connectRealAccount(provider.id)} className="w-full py-3 px-6 rounded-xl font-bold text-xs uppercase tracking-wider bg-gray-900 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10">
+                                  Connect {provider.label} (real)
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-xs text-gray-400">Not connected yet. Aegis requests real, scoped access via {provider.label.split(' (')[0]}&rsquo;s actual OAuth flow, and the revoke button actually calls it to invalidate the token.</p>
+                                <button onClick={() => connectRealAccount(provider.id)} className="w-full py-3 px-6 rounded-xl font-bold text-xs uppercase tracking-wider bg-gray-900 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10">
+                                  Connect {provider.label} (real)
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
