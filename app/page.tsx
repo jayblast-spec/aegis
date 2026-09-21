@@ -404,31 +404,63 @@ export default function Home() {
               </div>
 
               <div className="lg:col-span-5 relative">
-                <div className="rounded-3xl p-6 relative overflow-hidden" style={{ background: 'rgba(13,17,23,.85)', backdropFilter: 'blur(16px)', border: '1px solid rgba(16,185,129,.25)', boxShadow: '0 0 25px -5px rgba(16,185,129,.15)' }}>
-                  <div className="flex items-center justify-between pb-4 border-b border-gray-800 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                      <span className="text-emerald-400 font-semibold">AEGIS SANDBOX: {killed ? 'LOCKED DOWN' : 'ACTIVE'}</span>
-                    </div>
+                <div className="relative w-full aspect-square flex items-center justify-center">
+                  {/* Animated background gradient */}
+                  <div className="absolute inset-0 rounded-3xl opacity-60" style={{ background: 'radial-gradient(circle at 50% 30%, rgba(59,130,246,.3), rgba(6,182,212,.2), transparent 70%)', filter: 'blur(40px)' }} />
+
+                  {/* Outer glow rings */}
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+                    className="absolute inset-0 rounded-3xl border border-cyan-500/20"
+                    style={{ boxShadow: '0 0 40px rgba(6,182,212,.3)' }}
+                  />
+
+                  {/* Middle shield container */}
+                  <div className="relative w-64 h-64 flex items-center justify-center">
+                    {/* Shield background */}
+                    <motion.div
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.8 }}
+                      className="absolute inset-0 rounded-3xl border-2"
+                      style={{ borderColor: 'rgba(59,130,246,.6)', background: 'radial-gradient(circle at 30% 30%, rgba(59,130,246,.15), rgba(6,182,212,.05))', boxShadow: '0 0 50px rgba(59,130,246,.4), inset 0 0 50px rgba(6,182,212,.1)' }}
+                    />
+
+                    {/* Center icon with pulse */}
+                    <motion.div
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 3, repeat: Infinity }}
+                      className="relative z-10"
+                    >
+                      <i data-lucide={killed ? 'shield-off' : 'shield-check'} className={`w-24 h-24 ${killed ? 'text-red-400' : 'text-cyan-400'}`} style={{ filter: killed ? 'drop-shadow(0 0 20px rgba(239,68,68,.6))' : 'drop-shadow(0 0 30px rgba(6,182,212,.8))' }} />
+                    </motion.div>
+
+                    {/* Corner indicators */}
+                    {[
+                      { icon: 'lock', pos: 'top-6 left-6', color: 'text-cyan-400' },
+                      { icon: 'cpu', pos: 'top-6 right-6', color: 'text-blue-400' },
+                      { icon: 'zap', pos: 'bottom-6 left-6', color: 'text-emerald-400' },
+                      { icon: 'shield-alert', pos: 'bottom-6 right-6', color: 'text-amber-400' },
+                    ].map((item, i) => (
+                      <motion.i
+                        key={i}
+                        data-lucide={item.icon}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.2 + i * 0.1 }}
+                        className={`absolute w-6 h-6 ${item.color} ${item.pos}`}
+                      />
+                    ))}
                   </div>
-                  <div className="relative w-full h-[300px] my-4 flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-2xl border border-emerald-500/20" style={{ background: 'radial-gradient(circle at center, rgba(16,185,129,.08), transparent 70%)' }} />
-                    <div className="relative w-40 h-40 rounded-full border border-emerald-500/30 flex items-center justify-center animate-spin-slow">
-                      <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, rgba(16,185,129,.35), transparent 70%)' }} />
-                    </div>
-                    <i data-lucide={killed ? 'shield-off' : 'shield-check'} className={`absolute w-16 h-16 ${killed ? 'text-rose-500' : 'text-emerald-400'}`} />
-                    <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-2" style={{ fontFamily: "'JetBrains Mono', monospace", background: 'rgba(13,17,23,.75)' }}>
-                      <i data-lucide="lock" className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Spending limit: <strong className="text-white">${spending}/day</strong></span>
-                    </div>
-                    <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-lg border border-cyan-500/30 text-[11px] text-cyan-300 flex items-center gap-2" style={{ fontFamily: "'JetBrains Mono', monospace", background: 'rgba(13,17,23,.75)' }}>
-                      <i data-lucide="shield-alert" className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Injection test: <strong className="text-white">{log.some(l => l.tone === 'danger') ? 'BLOCKED' : 'READY'}</strong></span>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t border-gray-800 text-xs text-gray-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    Scroll down to run this yourself in the sandbox below — every result here is generated live in your browser, nothing is prerecorded.
-                  </div>
+
+                  {/* Data stream effect */}
+                  <motion.div
+                    animate={{ opacity: [0.3, 0.7, 0.3] }}
+                    transition={{ duration: 4, repeat: Infinity }}
+                    className="absolute inset-0 rounded-3xl pointer-events-none"
+                    style={{ background: 'linear-gradient(135deg, transparent 30%, rgba(6,182,212,.1) 50%, transparent 70%)', boxShadow: 'inset 0 0 40px rgba(59,130,246,.1)' }}
+                  />
                 </div>
               </div>
             </div>
