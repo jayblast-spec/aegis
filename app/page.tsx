@@ -139,7 +139,7 @@ export default function Home() {
     setScopes(preset.scopes)
     setApprovalTrigger(preset.approvalTrigger)
     setBanner({ text: `Preset applied: ${preset.name}`, tone: 'ok' })
-    setLog(prev => [...prev, { text: `// Applied preset: ${preset.name} — ${preset.description}`, tone: 'ok' }])
+    setLog(prev => [...prev, { text: `// Applied preset: ${preset.name}: ${preset.description}`, tone: 'ok' }])
     setValidation(null)
   }
 
@@ -352,7 +352,7 @@ export default function Home() {
               <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <i data-lucide="shield" className="w-3.5 h-3.5" />
-                  <span>NEUTRAL AUTHORITY LAYER FOR AGENTIC AI — PROTOCOL</span>
+                  <span>NEUTRAL AUTHORITY LAYER FOR AGENTIC AI</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
                   Set Portable, Enforceable <br className="hidden sm:block" />
@@ -377,7 +377,7 @@ export default function Home() {
                     </span>
                   ))}
                 </div>
-                <p className="text-[11px] text-gray-500">Conceptual cross-model architecture — no affiliation or current integration with these providers is implied.</p>
+                <p className="text-[11px] text-gray-500">Conceptual cross-model architecture. No affiliation or current integration with these providers is implied.</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
                   <a href="#sandbox" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3">
                     <i data-lucide="play-circle" className="w-5 h-5" />
@@ -436,7 +436,7 @@ export default function Home() {
             </div>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-6">Not another AI assistant. The trust layer every agent will need.</h2>
             <p className="text-lg text-gray-300 leading-relaxed mb-4">
-              Aegis is designed to let a person set portable, enforceable boundaries for every AI they use — what it may access and do, spending and sharing limits, when approval is mandatory, and a universal action receipt with a revoke button and a kill switch.
+              Aegis is designed to let a person set portable, enforceable boundaries for every AI they use: what it may access and do, spending and sharing limits, when approval is mandatory, and a universal action receipt with a revoke button and a kill switch.
             </p>
             <p className="text-lg text-gray-300 leading-relaxed mb-4">
               As agents take on more of representing people — across assistants, phones, banks, and everyday apps — someone has to hold that boundary. A platform that also builds the agent has a structural conflict of interest in also being the referee over it. They can ship a better chatbot; they can&rsquo;t credibly own the neutral authority layer across their own rivals.
