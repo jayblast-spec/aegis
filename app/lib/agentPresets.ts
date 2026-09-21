@@ -1,8 +1,25 @@
+export interface ScopeConfig {
+  email_read: boolean
+  email_send: boolean
+  calendar_read: boolean
+  calendar_write: boolean
+  drive_read: boolean
+  drive_write: boolean
+  banking_read: boolean
+  banking_transfer: boolean
+  analytics_read: boolean
+  analytics_modify: boolean
+  customer_data_view: boolean
+  customer_data_export: boolean
+  payment_processing: boolean
+  vendor_apis_read: boolean
+}
+
 export interface AgentPreset {
   name: string
   description: string
   spending: number
-  scopes: Record<string, boolean>
+  scopes: ScopeConfig
   approvalTrigger: string
 }
 

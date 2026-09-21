@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, type DelegationRow } from '@/lib/supabaseClient'
 import { OAUTH_PROVIDERS, buildOAuthAuthUrl } from '@/lib/oauthProviders'
 import { SiteHeader, SiteFooter } from './components/SiteChrome'
+import { SandboxLog } from './components/SandboxLog'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { exportDelegationsToCSV } from './lib/exportUtils'
+import { getAgentPresets, type AgentPreset } from './lib/agentPresets'
 
 type OAuthConnectionRow = {
   id: string
@@ -124,6 +129,63 @@ export default function Home() {
       .then(({ data }) => setOauthConnections((data as OAuthConnectionRow[]) ?? []))
   }, [session])
 
+  // Apply preset configuration
+  const applyPreset = (preset: AgentPreset) => {
+    setSpending(preset.spending)
+    setScopes(preset.scopes)
+    setApprovalTrigger(preset.approvalTrigger)
+    setBanner({ text: `Preset applied: ${preset.name}`, tone: 'ok' })
+    setLog(prev => [...prev, { text: `// Applied preset: ${preset.name} — ${preset.description}`, tone: 'ok' }])
+  }
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    '?': () => {
+      setLog(prev => [...prev, { text: '// Available shortcuts: R=Reset, E=Export, S=Submit action', tone: 'muted' }])
+    },
+    'r': () => {
+      const defaultScopes = {
+        email_read: true,
+        email_send: false,
+        calendar_read: true,
+        calendar_write: false,
+        drive_read: true,
+        drive_write: false,
+        banking_read: true,
+        banking_transfer: false,
+        analytics_read: true,
+        analytics_modify: false,
+        customer_data_view: true,
+        customer_data_export: false,
+        payment_processing: false,
+        vendor_apis_read: true,
+      }
+      setAgent(defaultAgents[0].id)
+      setSpending(250)
+      setApprovalTrigger('100')
+      setScopes(defaultScopes)
+      setLog([{ text: '// System ready. Sandbox reset.', tone: 'muted' }])
+      setBanner({ text: 'Sandbox reset', tone: 'ok' })
+    },
+    'e': () => {
+      if (delegation) {
+        const exportData = {
+          id: delegation.id,
+          provider: delegation.agent_name || 'Unknown',
+          account_email: null,
+          scope: 'mixed',
+          status: delegation.status as 'active' | 'revoked',
+          created_at: delegation.created_at,
+          revoked_at: delegation.revoked_at,
+        }
+        exportDelegationsToCSV([exportData])
+        setBanner({ text: 'Delegation exported to CSV', tone: 'ok' })
+      } else {
+        setBanner({ text: 'No delegation to export', tone: 'warn' })
+      }
+    },
+  })
+
   function connectionFor(providerId: string) {
     return oauthConnections.find(c => c.provider === providerId && c.status === 'active') ?? null
   }
@@ -174,9 +236,9 @@ export default function Home() {
       .insert({
         user_id: session.user.id,
         agent_name: currentAgent.label,
-        scope_email: scopeEmail,
-        scope_bank: scopeBank,
-        scope_pii: scopePii,
+        scope_email: scopes.email_read || scopes.email_send,
+        scope_bank: scopes.banking_read || scopes.banking_transfer,
+        scope_pii: scopes.customer_data_view || scopes.customer_data_export,
         spending_cap_cents: spending * 100,
         approval_trigger_cents: approvalTrigger === 'always' ? 0 : Number(approvalTrigger) * 100,
       })
@@ -393,6 +455,37 @@ export default function Home() {
                 <div className="text-lg font-bold text-white mb-2">&ldquo;Unlikely to ever be fully solved&rdquo;</div>
                 <p className="text-sm text-gray-300 leading-relaxed">is how OpenAI describes prompt injection for browser agents — malicious instructions hidden in ordinary web content that can hijack what an agent does next.</p>
                 <a href="https://openai.com/index/hardening-atlas-against-prompt-injection/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-emerald-400 mt-3 inline-block">OpenAI, hardening ChatGPT Atlas →</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-12 bg-gray-900/40 border-b border-gray-800/50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-2xl mx-auto">
+              <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/60 space-y-3">
+                {session ? (
+                  <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/60 text-xs text-gray-400 flex items-center justify-between" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    <span>Signed in as <span className="text-emerald-400">{session.user.email}</span></span>
+                    <button onClick={signOut} className="text-gray-500 hover:text-white">Sign out</button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs text-gray-400">Sign in to make your delegation and kill switch real — persisted to your account, not just this browser tab.</p>
+                    <div className="flex gap-2">
+                      <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@email.com" className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-emerald-500 focus:outline-none" />
+                      <button onClick={sendMagicLink} disabled={authStatus === 'sending'} className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-50">
+                        {authStatus === 'sending' ? 'Sending…' : 'Send magic link'}
+                      </button>
+                    </div>
+                    {authStatus === 'sent' && <p className="text-[11px] text-emerald-400">Check your email for a sign-in link.</p>}
+                    {authStatus === 'error' && <p className="text-[11px] text-rose-400">Couldn&rsquo;t send the link — try again.</p>}
+                    <button onClick={() => setKilled(k => !k)} className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase group ${killed ? 'bg-gray-800 text-gray-300' : 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50'}`}>
+                      <i data-lucide="power" className="w-5 h-5" />
+                      <span>{killed ? 'Restore Sandbox (local only)' : 'Trigger Kill Switch (local demo — sign in above to make it real)'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -647,25 +740,6 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="pt-4 space-y-3">
-                  {session ? (
-                    <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/60 text-xs text-gray-400 flex items-center justify-between" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      <span>Signed in as <span className="text-emerald-400">{session.user.email}</span></span>
-                      <button onClick={signOut} className="text-gray-500 hover:text-white">Sign out</button>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/60 space-y-2">
-                      <p className="text-xs text-gray-400">Sign in to make your delegation and kill switch real — persisted to your account, not just this browser tab.</p>
-                      <div className="flex gap-2">
-                        <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@email.com" className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-emerald-500 focus:outline-none" />
-                        <button onClick={sendMagicLink} disabled={authStatus === 'sending'} className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-50">
-                          {authStatus === 'sending' ? 'Sending…' : 'Send magic link'}
-                        </button>
-                      </div>
-                      {authStatus === 'sent' && <p className="text-[11px] text-emerald-400">Check your email for a sign-in link.</p>}
-                      {authStatus === 'error' && <p className="text-[11px] text-rose-400">Couldn&rsquo;t send the link — try again.</p>}
-                    </div>
-                  )}
-
                   {session && delegation && delegation.status === 'active' && (
                     <button onClick={revokeRealDelegation} disabled={delegationBusy} className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50 disabled:opacity-50">
                       <i data-lucide="power" className="w-5 h-5" />
@@ -676,12 +750,6 @@ export default function Home() {
                     <button onClick={saveRealDelegation} disabled={delegationBusy} className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase bg-gray-900 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50">
                       <i data-lucide="shield-check" className="w-5 h-5" />
                       <span>{delegationBusy ? 'Saving…' : `Grant Real Delegation to ${currentAgent.label}`}</span>
-                    </button>
-                  )}
-                  {!session && (
-                    <button onClick={() => setKilled(k => !k)} className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase group ${killed ? 'bg-gray-800 text-gray-300' : 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50'}`}>
-                      <i data-lucide="power" className="w-5 h-5" />
-                      <span>{killed ? 'Restore Sandbox (local only)' : 'Trigger Kill Switch (local demo — sign in above to make it real)'}</span>
                     </button>
                   )}
 
