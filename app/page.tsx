@@ -404,24 +404,35 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="lg:col-span-5 relative">
+              <div className="lg:col-span-5 relative flex items-center justify-center">
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.8 }}
-                  className="relative w-full rounded-3xl overflow-hidden shadow-2xl"
-                  style={{ boxShadow: '0 0 60px rgba(6,182,212,.4)' }}
+                  className="relative w-full aspect-square rounded-3xl overflow-hidden"
+                  style={{ background: 'radial-gradient(circle at 30% 20%, rgba(6,182,212,.2), rgba(59,130,246,.1))', boxShadow: '0 0 60px rgba(6,182,212,.3)' }}
                 >
-                  <Image
-                    src="/hero.jpg"
-                    alt="Aegis AI Security Shield - Enforceable Portable Boundaries for AI Agents"
-                    width={600}
-                    height={600}
-                    priority
-                    className="w-full h-auto object-cover"
-                  />
-                  {/* Subtle glow overlay */}
-                  <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{ boxShadow: 'inset 0 0 40px rgba(6,182,212,.1)' }} />
+                  {/* Animated shield visual */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <motion.div
+                      animate={{ scale: [1, 1.02, 1], rotate: 360 }}
+                      transition={{ duration: 20, repeat: Infinity }}
+                      className="relative"
+                    >
+                      <svg width="280" height="280" viewBox="0 0 280 280" className="drop-shadow-lg" style={{ filter: 'drop-shadow(0 0 30px rgba(6,182,212,.6))' }}>
+                        <defs>
+                          <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="rgba(6,182,212,.8)" />
+                            <stop offset="100%" stopColor="rgba(59,130,246,.6)" />
+                          </linearGradient>
+                        </defs>
+                        <path d="M140,20 L60,60 L60,140 Q60,200 140,240 Q220,200 220,140 L220,60 Z" fill="url(#shieldGradient)" stroke="rgba(6,182,212,.6)" strokeWidth="2" />
+                        <circle cx="140" cy="130" r="50" fill="none" stroke="rgba(6,182,212,.8)" strokeWidth="2" />
+                        <circle cx="140" cy="130" r="30" fill="rgba(6,182,212,.1)" />
+                        <text x="140" y="140" textAnchor="middle" fontSize="24" fill="rgba(6,182,212,.9)" fontWeight="bold">AI</text>
+                      </svg>
+                    </motion.div>
+                  </div>
                 </motion.div>
               </div>
             </div>
