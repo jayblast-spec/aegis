@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, type DelegationRow } from '@/lib/supabaseClient'
@@ -404,64 +405,24 @@ export default function Home() {
               </div>
 
               <div className="lg:col-span-5 relative">
-                <div className="relative w-full aspect-square flex items-center justify-center">
-                  {/* Animated background gradient */}
-                  <div className="absolute inset-0 rounded-3xl opacity-60" style={{ background: 'radial-gradient(circle at 50% 30%, rgba(59,130,246,.3), rgba(6,182,212,.2), transparent 70%)', filter: 'blur(40px)' }} />
-
-                  {/* Outer glow rings */}
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-                    className="absolute inset-0 rounded-3xl border border-cyan-500/20"
-                    style={{ boxShadow: '0 0 40px rgba(6,182,212,.3)' }}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8 }}
+                  className="relative w-full rounded-3xl overflow-hidden shadow-2xl"
+                  style={{ boxShadow: '0 0 60px rgba(6,182,212,.4)' }}
+                >
+                  <Image
+                    src="/hero.jpg"
+                    alt="Aegis AI Security Shield - Enforceable Portable Boundaries for AI Agents"
+                    width={600}
+                    height={600}
+                    priority
+                    className="w-full h-auto object-cover"
                   />
-
-                  {/* Middle shield container */}
-                  <div className="relative w-64 h-64 flex items-center justify-center">
-                    {/* Shield background */}
-                    <motion.div
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ duration: 0.8 }}
-                      className="absolute inset-0 rounded-3xl border-2"
-                      style={{ borderColor: 'rgba(59,130,246,.6)', background: 'radial-gradient(circle at 30% 30%, rgba(59,130,246,.15), rgba(6,182,212,.05))', boxShadow: '0 0 50px rgba(59,130,246,.4), inset 0 0 50px rgba(6,182,212,.1)' }}
-                    />
-
-                    {/* Center icon with pulse */}
-                    <motion.div
-                      animate={{ scale: [1, 1.05, 1] }}
-                      transition={{ duration: 3, repeat: Infinity }}
-                      className="relative z-10"
-                    >
-                      <i data-lucide={killed ? 'shield-off' : 'shield-check'} className={`w-24 h-24 ${killed ? 'text-red-400' : 'text-cyan-400'}`} style={{ filter: killed ? 'drop-shadow(0 0 20px rgba(239,68,68,.6))' : 'drop-shadow(0 0 30px rgba(6,182,212,.8))' }} />
-                    </motion.div>
-
-                    {/* Corner indicators */}
-                    {[
-                      { icon: 'lock', pos: 'top-6 left-6', color: 'text-cyan-400' },
-                      { icon: 'cpu', pos: 'top-6 right-6', color: 'text-blue-400' },
-                      { icon: 'zap', pos: 'bottom-6 left-6', color: 'text-emerald-400' },
-                      { icon: 'shield-alert', pos: 'bottom-6 right-6', color: 'text-amber-400' },
-                    ].map((item, i) => (
-                      <motion.i
-                        key={i}
-                        data-lucide={item.icon}
-                        initial={{ opacity: 0, scale: 0 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.2 + i * 0.1 }}
-                        className={`absolute w-6 h-6 ${item.color} ${item.pos}`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Data stream effect */}
-                  <motion.div
-                    animate={{ opacity: [0.3, 0.7, 0.3] }}
-                    transition={{ duration: 4, repeat: Infinity }}
-                    className="absolute inset-0 rounded-3xl pointer-events-none"
-                    style={{ background: 'linear-gradient(135deg, transparent 30%, rgba(6,182,212,.1) 50%, transparent 70%)', boxShadow: 'inset 0 0 40px rgba(59,130,246,.1)' }}
-                  />
-                </div>
+                  {/* Subtle glow overlay */}
+                  <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{ boxShadow: 'inset 0 0 40px rgba(6,182,212,.1)' }} />
+                </motion.div>
               </div>
             </div>
           </div>
