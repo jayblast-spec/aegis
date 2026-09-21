@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { MobileNav } from './MobileNav'
 
 export function SiteHeader({ active }: { active?: 'platform' | 'thesis' | 'sandbox' | 'receipt' | 'neutral-advantage' | 'compare' }) {
   const link = (key: string, cls = '') => `hover:text-emerald-400 transition-colors ${active === key ? 'text-emerald-400' : ''} ${cls}`
@@ -36,10 +39,13 @@ export function SiteHeader({ active }: { active?: 'platform' | 'thesis' | 'sandb
           <Link href="/#neutral-advantage" className={link('neutral-advantage')}>Neutrality</Link>
           <Link href="/compare" className={link('compare')}>Compare</Link>
         </nav>
-        <Link href="/#sandbox" className="relative group overflow-hidden rounded-xl p-[1px] font-semibold text-xs sm:text-sm">
+        <div className="flex items-center gap-4">
+          <MobileNav active={active} />
+          <Link href="/#sandbox" className="relative group overflow-hidden rounded-xl p-[1px] font-semibold text-xs sm:text-sm">
           <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600 opacity-80 group-hover:opacity-100 transition-all" />
           <span className="relative px-4 py-2.5 rounded-[11px] bg-[#07090E] flex items-center gap-2 group-hover:bg-transparent text-white">Try the Sandbox</span>
         </Link>
+        </div>
       </div>
     </header>
   )
