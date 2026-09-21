@@ -552,7 +552,24 @@ export default function Home() {
                     <span>$50</span><span>$1,000</span><span>$2,000</span>
                   </div>
                 </div>
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3 pt-4 border-t border-gray-800/50">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider block" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Quick Presets</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {getAgentPresets().map(preset => (
+                      <motion.button
+                        key={preset.id}
+                        onClick={() => applyPreset(preset)}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="px-3 py-2 text-xs rounded-lg bg-gray-800/50 hover:bg-gray-700 border border-gray-700 hover:border-emerald-500/50 transition-all text-gray-300 hover:text-emerald-400 text-left"
+                      >
+                        <div className="font-semibold text-gray-200">{preset.name}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">${preset.spending}/day</div>
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3 pt-4 border-t border-gray-800/50">
                   <label className="text-xs text-gray-400 uppercase tracking-wider block mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Permitted scope isolation</label>
                   <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                     <div className="space-y-2">
