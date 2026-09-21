@@ -129,6 +129,9 @@ export default function Home() {
       .then(({ data }) => setOauthConnections((data as OAuthConnectionRow[]) ?? []))
   }, [session])
 
+  // Form validation state
+  const [validation, setValidation] = useState<{ field: string; message: string } | null>(null)
+
   // Apply preset configuration
   const applyPreset = (preset: AgentPreset) => {
     setSpending(preset.spending)
@@ -136,6 +139,21 @@ export default function Home() {
     setApprovalTrigger(preset.approvalTrigger)
     setBanner({ text: `Preset applied: ${preset.name}`, tone: 'ok' })
     setLog(prev => [...prev, { text: `// Applied preset: ${preset.name} — ${preset.description}`, tone: 'ok' }])
+    setValidation(null)
+  }
+
+  // Handle spending validation
+  const handleSpendingChange = (value: number) => {
+    if (value < 50) {
+      setValidation({ field: 'spending', message: 'Minimum spending is $50' })
+      return
+    }
+    if (value > 2000) {
+      setValidation({ field: 'spending', message: 'Maximum spending is $2,000' })
+      return
+    }
+    setValidation(null)
+    setSpending(value)
   }
 
   // Keyboard shortcuts
@@ -547,10 +565,19 @@ export default function Home() {
                     <span className="text-gray-400 uppercase">Daily spending limit</span>
                     <span className="text-emerald-400 font-bold text-sm">${spending} / day</span>
                   </div>
-                  <input type="range" min={50} max={2000} step={50} value={spending} onChange={e => setSpending(Number(e.target.value))} className="w-full accent-emerald-500 bg-gray-800 h-2 rounded-lg cursor-pointer" />
+                  <input type="range" min={50} max={2000} step={50} value={spending} onChange={e => handleSpendingChange(Number(e.target.value))} className="w-full accent-emerald-500 bg-gray-800 h-2 rounded-lg cursor-pointer" />
                   <div className="flex justify-between text-[10px] text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                     <span>$50</span><span>$1,000</span><span>$2,000</span>
                   </div>
+                  {validation?.field === 'spending' && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-red-400 mt-2"
+                    >
+                      {validation.message}
+                    </motion.p>
+                  )}
                 </div>
                 <div className="space-y-3 pt-4 border-t border-gray-800/50">
                   <label className="text-xs text-gray-400 uppercase tracking-wider block" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Quick Presets</label>
@@ -711,8 +738,22 @@ export default function Home() {
                       </div>
                       <p className="text-xs text-gray-300">{approval.desc}</p>
                       <div className="flex gap-3 pt-1">
-                        <button onClick={() => decide(true)} className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs transition-all flex items-center gap-1.5"><i data-lucide="check-circle" className="w-4 h-4" />Approve</button>
-                        <button onClick={() => decide(false)} className="px-4 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition-all flex items-center gap-1.5"><i data-lucide="x-circle" className="w-4 h-4" />Block</button>
+                        <motion.button
+                          onClick={() => decide(true)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs transition-all flex items-center gap-1.5"
+                        >
+                          <i data-lucide="check-circle" className="w-4 h-4" />Approve
+                        </motion.button>
+                        <motion.button
+                          onClick={() => decide(false)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-4 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition-all flex items-center gap-1.5"
+                        >
+                          <i data-lucide="x-circle" className="w-4 h-4" />Block
+                        </motion.button>
                       </div>
                     </motion.div>
                   )}
