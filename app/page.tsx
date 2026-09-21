@@ -666,12 +666,22 @@ export default function Home() {
                     <span className="text-xs text-emerald-400 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Sandbox active</span>
                   </div>
                   <div className="grid sm:grid-cols-3 gap-3">
-                    {simActions.map(a => (
-                      <button key={a.id} onClick={() => runAction(a)} disabled={killed} className={`p-3 rounded-xl text-left transition-all group disabled:opacity-40 ${a.kind === 'malicious' ? 'bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30' : 'bg-gray-900 hover:bg-gray-800 border border-gray-700'}`}>
+                    {simActions.map((a, idx) => (
+                      <motion.button
+                        key={a.id}
+                        onClick={() => runAction(a)}
+                        disabled={killed}
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className={`p-3 rounded-xl text-left transition-all group disabled:opacity-40 ${a.kind === 'malicious' ? 'bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30' : 'bg-gray-900 hover:bg-gray-800 border border-gray-700'}`}
+                      >
                         <div className={`text-xs mb-1 ${a.kind === 'malicious' ? 'text-rose-400' : a.kind === 'financial' ? 'text-amber-400' : 'text-gray-400'}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>{a.kind === 'malicious' ? 'Malicious threat' : a.kind === 'financial' ? 'Financial request' : 'Standard task'}</div>
                         <div className="text-sm font-semibold text-white">{a.label}</div>
                         <div className="text-[11px] text-gray-500 mt-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Cost: {a.cost}</div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                   <div className="bg-black/80 rounded-xl p-4 border border-gray-800 text-xs space-y-3 min-h-[220px] flex flex-col justify-between overflow-hidden shadow-inner" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
@@ -688,7 +698,13 @@ export default function Home() {
                     </div>
                   </div>
                   {approval.open && (
-                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 space-y-3">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                      className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 space-y-3"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm font-bold text-amber-300"><i data-lucide="shield-alert" className="w-5 h-5 text-amber-400" /><span>MANDATORY APPROVAL REQUIRED</span></div>
                         <span className="text-xs bg-amber-500/20 px-2 py-0.5 rounded" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Risk: HIGH</span>
@@ -698,7 +714,7 @@ export default function Home() {
                         <button onClick={() => decide(true)} className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs transition-all flex items-center gap-1.5"><i data-lucide="check-circle" className="w-4 h-4" />Approve</button>
                         <button onClick={() => decide(false)} className="px-4 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition-all flex items-center gap-1.5"><i data-lucide="x-circle" className="w-4 h-4" />Block</button>
                       </div>
-                    </div>
+                    </motion.div>
                   )}
                 </div>
               </div>
