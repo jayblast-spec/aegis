@@ -80,6 +80,7 @@ export default function Home() {
   const [log, setLog] = useState<LogLine[]>([{ text: '// System ready. Click any action above to test the policy simulator...', tone: 'muted' }])
   const [banner, setBanner] = useState<{ text: string; tone: 'idle' | 'ok' | 'warn' | 'danger' }>({ text: 'Waiting for agent action...', tone: 'idle' })
   const [approval, setApproval] = useState<{ open: boolean; desc: string }>({ open: false, desc: '' })
+  const [pendingAction, setPendingAction] = useState<{ agentId: string; actionLabel: string; cost: number } | null>(null)
   const [killed, setKilled] = useState(false)
   const [clock, setClock] = useState('')
 
@@ -364,9 +365,11 @@ export default function Home() {
         setLog(l => [...l, { text: `[${t}] ALLOWED — within daily limit ($${spending}/day).`, tone: 'ok' }])
         setBanner({ text: `Allowed: ${action.label}`, tone: 'ok' })
       } else if (result.decision.decision === 'REQUIRES_APPROVAL') {
+        const actionId = `${agentId}-${Date.now()}`
+        setPendingAction({ agentId, actionLabel: action.label, cost: actionCost })
         setLog(l => [...l, { text: `[${t}] SUSPENDED — exceeds approval threshold ($${approvalTrigger}). Awaiting your decision.`, tone: 'warn' }])
         setBanner({ text: 'Awaiting mandatory approval...', tone: 'warn' })
-        setApproval({ open: true, desc: `Agent requested action costing $${actionCost.toFixed(2)} exceeding your threshold. Action suspended pending your decision.` })
+        setApproval({ open: true, desc: `Agent requested action costing $${actionCost.toFixed(2)} exceeding your threshold ($${approvalTrigger}). Action suspended pending your decision.` })
       } else if (result.decision.decision === 'BLOCKED') {
         setLog(l => [...l, { text: `[${t}] BLOCKED — ${result.reason}`, tone: 'danger' }])
         setBanner({ text: `Blocked: ${action.label}`, tone: 'danger' })
@@ -378,16 +381,38 @@ export default function Home() {
     }
   }
 
-  function decide(approved: boolean) {
+  async function decide(approved: boolean) {
     const t = timestamp()
+    const userId = 'user-' + (authEmail || 'demo')
+
+    if (pendingAction) {
+      // Submit approval decision to backend
+      try {
+        await fetch('/api/approvals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            agentId: pendingAction.agentId,
+            action: pendingAction.actionLabel,
+            actionId: `${pendingAction.agentId}-${Date.now()}`,
+            approved,
+          }),
+        })
+      } catch (e) {
+        console.error('Approval submission error:', e)
+      }
+    }
+
     if (approved) {
       setLog(l => [...l, { text: `[${t}] You approved the suspended action.`, tone: 'ok' }])
       setBanner({ text: 'Approved by you', tone: 'ok' })
     } else {
-      setLog(l => [...l, { text: `[${t}] You blocked the suspended action.`, tone: 'danger' }])
-      setBanner({ text: 'Blocked by you', tone: 'danger' })
+      setLog(l => [...l, { text: `[${t}] You rejected the suspended action.`, tone: 'danger' }])
+      setBanner({ text: 'Rejected by you', tone: 'danger' })
     }
     setApproval({ open: false, desc: '' })
+    setPendingAction(null)
   }
 
   const toneClass: Record<string, string> = { muted: 'text-gray-500', ok: 'text-emerald-400', warn: 'text-amber-400', danger: 'text-rose-400' }
