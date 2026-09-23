@@ -406,8 +406,8 @@ export default function Home() {
             <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
               <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  <i data-lucide="shield" className="w-3.5 h-3.5" />
-                  <span>NEUTRAL AUTHORITY LAYER FOR AGENTIC AI</span>
+                  <i data-lucide="zap" className="w-3.5 h-3.5" />
+                  <span>LIVE ENFORCEMENT BACKEND — PRODUCTION API</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
                   Set Portable, Enforceable <br className="hidden sm:block" />
@@ -559,7 +559,7 @@ export default function Home() {
                     {authStatus === 'error' && <p className="text-[11px] text-rose-400">Couldn&rsquo;t send the link — try again.</p>}
                     <button onClick={() => setKilled(k => !k)} className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase group ${killed ? 'bg-gray-800 text-gray-300' : 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50'}`}>
                       <i data-lucide="power" className="w-5 h-5" />
-                      <span>{killed ? 'Restore Sandbox (local only)' : 'Trigger Kill Switch (local demo — sign in above to make it real)'}</span>
+                      <span>{killed ? 'Restore Agent Access' : 'Revoke All Agent Access (live enforcement)'}</span>
                     </button>
                   </div>
                 )}
