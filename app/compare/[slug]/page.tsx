@@ -10,8 +10,9 @@ export function generateStaticParams() {
   return comparisons.map(c => ({ slug: c.slug }))
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }): Metadata {
-  const c = getComparison(params.slug)
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const c = getComparison(slug)
   if (!c) return {}
   const title = `Aegis vs. ${c.name}: Honest Comparison (2026)`
   const description = `How Aegis, a concept delegation card for personal AI agents, compares to ${c.name} on use case, features, pricing, and ease of use. Adjacent alternatives, not direct substitutes.`
@@ -24,8 +25,9 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   }
 }
 
-export default function ComparisonPage({ params }: { params: { slug: string } }) {
-  const c = getComparison(params.slug)
+export default async function ComparisonPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const c = getComparison(slug)
   if (!c) return notFound()
   const related = comparisons.filter(x => x.slug !== c.slug).slice(0, 3)
 
