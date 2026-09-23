@@ -299,28 +299,83 @@ export default function Home() {
     return new Date().toLocaleTimeString('en-US', { hour12: true })
   }
 
-  function runAction(action: SimAction) {
+  async function runAction(action: SimAction) {
     const t = timestamp()
+    const userId = 'user-' + (authEmail || 'demo')
+    const agentId = agent
+
+    // Map scopes to enforcement API format
+    const enabledScopes = Object.entries(scopes)
+      .filter(([_, enabled]) => enabled)
+      .map(([scope]) => scope)
+
+    // Map action to cost
+    let actionCost = 0
+    let actionScopes: string[] = []
     if (action.kind === 'malicious') {
-      setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] BLOCKED — request falls outside granted scope isolation.`, tone: 'danger' }])
-      setBanner({ text: `Blocked: ${action.label}`, tone: 'danger' })
-      setApproval({ open: false, desc: '' })
-      return
+      actionCost = 0
+      actionScopes = ['exfiltrate', 'leak_pii']
+    } else if (action.kind === 'financial') {
+      actionCost = 450
+      actionScopes = ['banking_transfer', 'payment_processing']
+    } else {
+      actionCost = 0
+      actionScopes = ['email_read', 'calendar_read']
     }
-    if (action.kind === 'financial') {
-      const cost = 450
-      if (cost > Number(approvalTrigger) || approvalTrigger === 'always') {
-        setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] SUSPENDED — exceeds approval threshold ($${approvalTrigger === 'always' ? '0' : approvalTrigger}). Awaiting your decision.`, tone: 'warn' }])
+
+    // Set policy if not already set
+    try {
+      await fetch('/api/policies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          agentId,
+          policy: {
+            spendingCap: spending,
+            approvalThreshold: Number(approvalTrigger),
+            allowedScopes: enabledScopes,
+          },
+        }),
+      })
+    } catch (e) {
+      console.error('Policy set error:', e)
+    }
+
+    // Call enforcement API
+    setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }])
+
+    try {
+      const response = await fetch('/api/enforce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          agentId,
+          action: action.label,
+          cost: actionCost,
+          scopes: actionScopes,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.decision.decision === 'ALLOWED') {
+        setLog(l => [...l, { text: `[${t}] ALLOWED — within daily limit ($${spending}/day).`, tone: 'ok' }])
+        setBanner({ text: `Allowed: ${action.label}`, tone: 'ok' })
+      } else if (result.decision.decision === 'REQUIRES_APPROVAL') {
+        setLog(l => [...l, { text: `[${t}] SUSPENDED — exceeds approval threshold ($${approvalTrigger}). Awaiting your decision.`, tone: 'warn' }])
         setBanner({ text: 'Awaiting mandatory approval...', tone: 'warn' })
-        setApproval({ open: true, desc: `Agent requested a $${cost.toFixed(2)} transfer exceeding your threshold. Action suspended pending your decision.` })
-        return
+        setApproval({ open: true, desc: `Agent requested action costing $${actionCost.toFixed(2)} exceeding your threshold. Action suspended pending your decision.` })
+      } else if (result.decision.decision === 'BLOCKED') {
+        setLog(l => [...l, { text: `[${t}] BLOCKED — ${result.reason}`, tone: 'danger' }])
+        setBanner({ text: `Blocked: ${action.label}`, tone: 'danger' })
       }
-      setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] ALLOWED — within daily limit ($${spending}/day).`, tone: 'ok' }])
-      setBanner({ text: `Allowed: ${action.label}`, tone: 'ok' })
-      return
+    } catch (e) {
+      console.error('Enforcement error:', e)
+      setLog(l => [...l, { text: `[${t}] ERROR — enforcement check failed`, tone: 'danger' }])
+      setBanner({ text: 'Enforcement error', tone: 'danger' })
     }
-    setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }, { text: `[${t}] ALLOWED — read/draft scope, no spend.`, tone: 'ok' }])
-    setBanner({ text: `Allowed: ${action.label}`, tone: 'ok' })
   }
 
   function decide(approved: boolean) {
