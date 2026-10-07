@@ -114,7 +114,7 @@ npm install
 npm run dev
 ```
 
-The enforcement API needs `AEGIS_DATABASE_URL`: a Postgres connection string for the `aegis_app` role after applying the migration in `supabase/migrations/`. Optional: `AEGIS_PENDING_TTL_SECONDS` (default 900), `AEGIS_RELEASE_TTL_SECONDS` (600), `AEGIS_OWNER_SIGNUPS_PER_HOUR` (10 per network), `AEGIS_IP_SALT`. Without a database the API returns `503 not_configured`; it never falls back to in-memory state.
+The enforcement API needs `AEGIS_DATABASE_URL`: a Postgres connection string for the `aegis_app` role after applying the migration in `supabase/migrations/`. Optional: `AEGIS_PENDING_TTL_SECONDS` (default 900), `AEGIS_RELEASE_TTL_SECONDS` (600), `AEGIS_OWNER_SIGNUPS_PER_HOUR` (10 per network), `AEGIS_IP_SALT`, and `AEGIS_DATABASE_CA` (the PEM of your Postgres provider's root CA, needed for Supabase's pooler so TLS verification stays on). Without a database the API returns `503 not_configured`; it never falls back to in-memory state.
 
 ## Architecture Direction
 

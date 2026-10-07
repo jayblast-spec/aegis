@@ -63,7 +63,12 @@ export function getDb(): Db {
     max: 3,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 8_000,
-    ssl: { rejectUnauthorized: process.env.AEGIS_DATABASE_SSL_INSECURE === '1' ? false : true },
+    // Supabase's pooler presents a certificate chained to Supabase's own root CA,
+    // so AEGIS_DATABASE_CA carries that PEM and verification stays on.
+    ssl: {
+      rejectUnauthorized: process.env.AEGIS_DATABASE_SSL_INSECURE === '1' ? false : true,
+      ...(process.env.AEGIS_DATABASE_CA ? { ca: process.env.AEGIS_DATABASE_CA.replace(/\\n/g, '\n') } : {}),
+    },
   })
   shared = new PgDb(pool)
   return shared
