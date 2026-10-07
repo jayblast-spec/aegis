@@ -6,7 +6,7 @@
 
 *Part of ArkNet: continuity infrastructure for institutions, communities, and critical systems — governed digital intelligence, protected knowledge, modular infrastructure, resilient operations, and long-horizon Earth → Maritime → Orbital systems. Proactive survival before catastrophe.*
 
-Aegis explores one premise: as AI agents gain the ability to read, decide, and act across a person's digital life, their authority should stay visible, bounded, portable, and revocable by the person they represent. Today it is a working prototype — a policy-check API, a signed-in delegation dashboard, and one real OAuth connector whose revoke button invalidates the token at the provider.
+Aegis explores one premise: as AI agents gain the ability to read, decide, and act across a person's digital life, their authority should stay visible, bounded, portable, and revocable by the person they represent. Today it is an early build: a person sets limits once, and an authenticated enforcement API answers allowed, held for human approval, or blocked for every agent action, with one-click revoke and a durable decision log.
 
 <p>
   <a href="https://aegis-mauve-one.vercel.app"><img alt="Live Demo" src="https://img.shields.io/badge/Live-Demo-1D4ED8?style=for-the-badge&logo=vercel&logoColor=white"></a>
@@ -17,90 +17,104 @@ Aegis explores one premise: as AI agents gain the ability to read, decide, and a
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js%2015-App%20Router-000000?style=flat-square&logo=next.js&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React%2018-149ECA?style=flat-square&logo=react&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white">
-  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Auth%20%2B%20RLS-3ECF8E?style=flat-square&logo=supabase&logoColor=white">
+  <img alt="Postgres" src="https://img.shields.io/badge/Postgres-RLS%20%2B%20append--only%20log-3ECF8E?style=flat-square&logo=postgresql&logoColor=white">
   <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind%20CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white">
   <img alt="Framer Motion" src="https://img.shields.io/badge/Framer%20Motion-1D4ED8?style=flat-square&logo=framer&logoColor=white">
 </p>
 
 <p>
-  <img alt="Animated Aegis headline" src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=700&size=18&duration=2600&pause=650&color=1D4ED8&center=true&vCenter=true&width=760&lines=Delegate+%E2%86%92+Bound+%E2%86%92+Review+%E2%86%92+Revoke;Spending+cap%2C+scope+isolation%2C+approval+threshold;Real+OAuth+revoke+against+the+provider;Working+prototype%2C+not+yet+a+security+control">
+  <img alt="Animated Aegis headline" src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=700&size=18&duration=2600&pause=650&color=1D4ED8&center=true&vCenter=true&width=760&lines=Delegate+%E2%86%92+Bound+%E2%86%92+Approve+%E2%86%92+Revoke;Allowed+%C2%B7+Held+for+approval+%C2%B7+Blocked;Single-use+approvals%2C+append-only+decision+log;Early+build%2C+not+externally+audited">
 </p>
 
 </div>
 
 ## What It Does
 
-Aegis gives a person one place to define what an AI agent may do on their behalf and to take that authority back. The repository contains:
+A person sets limits for each AI agent once: a per-action spending cap, a rolling-window spending cap, the scopes it may use, and when an action needs their approval. Each agent gets its own API key and calls `POST /api/enforce` before acting. Aegis answers:
 
-1. **A policy-check API** (`/api/policies`, `/api/enforce`) that answers "may this agent take this action?" using three rules in order: spending cap → scope isolation → approval threshold. It returns `200 ALLOWED`, `202 REQUIRES_APPROVAL`, or `403 BLOCKED`, each with a reason and timestamp. A TypeScript client lives in `lib/aegisSDK.ts`.
-2. **A policy sandbox** on the landing page: pick an agent, set a spending limit, toggle scopes, set an approval threshold, then fire standard / financial / malicious sample actions through the API and watch the decisions in a live log.
-3. **Signed-in delegations** (Supabase magic-link auth): save a delegation to your account, revoke it, and keep a revocation event history. Rows are protected by row-level security.
-4. **A real Google connector** (Gmail, read-only scope): connect through Google's own OAuth flow; the revoke button calls Google's revoke endpoint so the token is invalidated at the source, not just flagged in a database.
-5. **A `/compare` hub** with sourced comparisons against adjacent platforms (Auth0 for AI Agents, Permit.io, Cerbos, Descope, Oso).
+- `200 ALLOWED`: within every limit; the spend is recorded against the rolling window.
+- `202 REQUIRES_APPROVAL`: held. A pending action is queued for the owner and expires if nobody decides.
+- `403 BLOCKED`: over a cap, outside the allowed scopes, no policy set (fail closed), or the agent was revoked.
 
-**Stage:** working prototype. The policy-check API keeps policies in server memory (reset on redeploy, not shared across serverless instances), and its "audit trail" is server console output only. Not secure enough for real delegation of money, secrets, health, or legal decisions.
+The owner approves or denies held actions in the [owner console](https://aegis-mauve-one.vercel.app/console) or through the API. Approval does not unblock anything by itself: the agent polls the held action, receives a single-use token bound to the SHA-256 hash of that exact request, and resubmits the identical request with the token. A different amount, recipient, scope set or agent is refused, and a second use of the token is refused. One click revokes an agent's key (or all of an owner's agents) and the very next enforcement call is blocked. Every decision, approval, denial, expiry and revoke is written to an append-only decision log with the actor and a server timestamp.
+
+The repository also contains:
+
+1. **The landing-page sandbox**, rewired to the real API. On first use it creates a throwaway owner account for the browser and one agent key per sample agent; the kill switch revokes those keys on the server.
+2. **`/console`**: owner account, agent registration (keys shown once), policy editor, approval queue, revoke and kill switch, and the decision log.
+3. **`/test`**: a live self-test that walks the full lifecycle against the deployment and reports pass/fail per step.
+4. **A `/compare` hub** with sourced comparisons against adjacent platforms (Auth0 for AI Agents, Permit.io, Cerbos, Descope, Oso).
+
+**Stage:** early build. Not externally audited or penetration-tested. Do not use it to guard real money, credentials, health or legal decisions yet.
 
 ## Autonomy and Human Control
 
-Aegis does not run agents; it is the checkpoint an agent is supposed to call before acting. What that checkpoint enforces today, honestly:
+Aegis does not run agents and does not sit in their network path; it is the checkpoint an agent calls before acting. What is enforced today:
 
-- **Works:** spending caps and scope isolation are enforced by the API — over-limit or out-of-scope requests are blocked. Actions above the approval threshold are returned as `REQUIRES_APPROVAL` rather than allowed.
-- **Works:** revoking a signed-in delegation persists to your account, and revoking the Google connection invalidates the token with Google.
-- **Not yet enforced:** an approval decision is recorded (`/api/approvals`) but does not resume, execute, or unblock the held action, and the enforcement API never reads it. The person approves in the UI; nothing downstream consumes that approval yet.
-- **Not yet enforced:** the policy API is unauthenticated — any caller can set or read the policy for any `userId`. It also does not check the signed-in delegation status, so revoking a delegation in the dashboard does not change what `/api/enforce` returns.
-- **Not yet enforced:** for signed-out visitors, the sandbox kill switch only disables the demo buttons in that browser tab.
-- **Compliance with Aegis is voluntary:** an agent that never calls `/api/enforce` is not stopped. Runtime interception in front of tool calls is on the roadmap, not built.
+- **Enforced:** policy writes, approvals, revokes and log reads require the owner's key; an owner can only see or change their own agents (checked in the service layer and again by Postgres row-level security).
+- **Enforced:** `/api/enforce` requires a per-agent key, stored only as a hash, and is scoped to the agent's owner.
+- **Enforced:** per-action cap, scope allow-list and a rolling-window cap (default 24 hours) so a large action split into small ones is still stopped. Decisions for one agent are serialised with a database lock, so parallel requests cannot race past the window.
+- **Enforced:** held actions expire (15 minutes by default); an approval must be released within 10 minutes and only once.
+- **Enforced:** revoke cancels the agent's open approvals and blocks it immediately, including any approval token it already holds.
+- **Not enforced:** an agent that never calls Aegis, or ignores a `403`, is not stopped. Aegis can only bind agents whose runtime or tool layer is wired to call it.
+- **Not yet built:** signed (cryptographically verifiable) receipts, external anchoring of the log, verified agent identity beyond the API key, per-key rate limiting of `/api/enforce`, and passkey or email login for owners (owner auth is a bearer key).
 
 ## How It Works
 
-- `app/api/policies/route.ts` and `lib/policyStore.ts` — store and read per-user, per-agent policies (in memory).
-- `app/api/enforce/route.ts` — the three-rule decision function and HTTP status mapping.
-- `app/api/approvals/route.ts` — records approve/deny decisions (in memory).
-- `app/api/oauth/exchange` and `app/api/oauth/revoke` — exchange the Google auth code, record the delegation and connection under the caller's own Supabase session (no service-role key), and revoke via Google's endpoint. Adding a provider is one entry in `lib/oauthProviders.ts`.
-- `app/page.tsx` — landing page, policy sandbox, signed-in delegation dashboard, and connector panel.
-- `app/test/page.tsx` — interactive page for exercising the enforcement rules.
-- `app/compare` and `lib/compare.ts` — the comparison hub with per-page metadata and structured data.
-- See `ENFORCEMENT_API.md` for request/response details.
+- `lib/server/policy.ts`: input validation and the pure decision function (per-action cap → scopes → rolling window → approval).
+- `lib/server/service.ts`: every operation runs in one Postgres transaction with the owner's id set for row-level security, takes a per-agent advisory lock where limits matter, and writes its decision-log row in the same transaction.
+- `lib/server/crypto.ts`: 256-bit typed secrets (`aeg_own_`, `aeg_agt_`, `aeg_apv_`), SHA-256 hashing, canonical JSON and the action payload hash.
+- `supabase/migrations/…_aegis_enforcement.sql`: the `aegis` schema. The app connects as a dedicated `aegis_app` role that can reach only this schema, cannot bypass RLS, and has no update or delete privilege on the decision log; a trigger also rejects updates, deletes and truncates on it for every role.
+- `app/api/*`: thin route handlers (`owners`, `agents`, `agents/[id]/revoke`, `agents/revoke-all`, `policies`, `enforce`, `actions/[id]`, `approvals`, `decisions`).
+- `lib/aegisSDK.ts`: typed client (`AegisOwner`, `AegisAgent`, including `waitAndRelease`).
+- `app/api/oauth/*`, `app/oauth/callback`: the earlier Google (Gmail read-only) connector. It depends on the original Aegis Supabase project, which is currently paused, so it is offline and no longer linked from the landing page.
+
+Full request and response details: [ENFORCEMENT_API.md](ENFORCEMENT_API.md).
 
 ## Engineering Notes
 
-**The real problem:** a "kill switch" that only flips a flag in the delegating app is theater — the agent still holds a working credential.
+**The real problem:** a "kill switch" or "approval" that only changes a flag in the delegating UI is theater; the agent still holds a working credential, and an approved action can be swapped for a different one.
 
-**The approach:** for the Google connector, revoke calls the provider's own OAuth revoke endpoint with the stored refresh (or access) token, and the database update records whether the provider confirmed it, so a failed upstream revoke is visible instead of silently reported as success.
+**The approach:** decisions are made server-side against durable state, the agent's own key is what gets revoked, and an approval is a single-use token bound to the hash of one exact request. The atomic `approved → consumed` update makes double-release impossible even under concurrent requests.
 
-**One real number:** enforcement short-circuits in a fixed order — spending cap, then scope, then approval threshold — so under a $100 cap a $450 out-of-scope transfer is reported as a cap violation (`403`), never as "needs approval."
+**One real number:** with a $100 approval threshold and a $200 rolling cap, three $90 transfers return `200, 200, 403`; the third is stopped by the window even though each one alone is under every per-action limit.
 
-**Not handled yet:** authenticated policy API, persistent policy and decision storage, approvals that actually release held actions, linking dashboard revocation to enforcement, encrypting stored OAuth tokens at the application layer (today they sit in RLS-protected columns), signed action receipts, and verified agent identity.
+## Testing
+
+```bash
+npm test          # vitest: unit tests + integration tests
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Integration tests run the real route handlers against real Postgres (PGlite, in-process) with the production migration applied, as the restricted `aegis_app` role. They cover: unauthenticated, wrong-key-type and cross-owner policy writes rejected; enforce requires an agent key and fails closed without a policy; allowed / held / blocked status codes; rolling-window task-splitting; approval releases only the exact matching action; substitution and replay rejected; denied and expired actions can't be released; revoke blocks immediately and kills issued tokens; kill switch scope; decision-log completeness; the log is append-only for the app role and superusers; RLS hides other owners' rows; owner sign-up rate limit. PGlite is a single connection, so the concurrency test there is serialised; in production the per-agent advisory lock provides that guarantee.
 
 ## Using the API
 
-Set a policy for an agent:
-
 ```bash
-curl -X POST https://aegis-mauve-one.vercel.app/api/policies \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"user-123","agentId":"agent-001","policy":{"spendingCap":100,"approvalThreshold":50,"allowedScopes":["read","write","query"]}}'
+BASE=https://aegis-mauve-one.vercel.app
+
+# 1. Owner account (the key is shown once)
+curl -s -X POST $BASE/api/owners -H 'Content-Type: application/json' -d '{"label":"me"}'
+# 2. Register an agent with the owner key (agent key shown once)
+curl -s -X POST $BASE/api/agents -H "Authorization: Bearer $OWNER_KEY" -H 'Content-Type: application/json' -d '{"name":"billing-agent"}'
+# 3. Set its limits
+curl -s -X PUT $BASE/api/policies -H "Authorization: Bearer $OWNER_KEY" -H 'Content-Type: application/json' \
+  -d '{"agentId":"'$AGENT_ID'","policy":{"perActionCap":500,"windowCap":600,"windowSeconds":86400,"approvalThreshold":100,"allowedScopes":["payments","read"]}}'
+# 4. The agent asks before acting
+curl -s -X POST $BASE/api/enforce -H "Authorization: Bearer $AGENT_KEY" -H 'Content-Type: application/json' \
+  -d '{"action":"pay_invoice","cost":450,"scopes":["payments"],"params":{"invoice":"INV-1"}}'
 ```
-
-Check an action:
-
-```bash
-curl -X POST https://aegis-mauve-one.vercel.app/api/enforce \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"user-123","agentId":"agent-001","action":"query_database","cost":25,"scopes":["read","query"]}'
-```
-
-Because policies live in memory, a policy set on one serverless instance may not be visible to the next request; use local development for repeatable testing.
 
 ## Local Development
 
 ```bash
 npm install
-npm run dev     # http://localhost:3000
-npm run build
+npm run dev
 ```
 
-Signed-in features need `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`; the Google connector also needs `GOOGLE_CLIENT_SECRET`.
+The enforcement API needs `AEGIS_DATABASE_URL`: a Postgres connection string for the `aegis_app` role after applying the migration in `supabase/migrations/`. Optional: `AEGIS_PENDING_TTL_SECONDS` (default 900), `AEGIS_RELEASE_TTL_SECONDS` (600), `AEGIS_OWNER_SIGNUPS_PER_HOUR` (10 per network), `AEGIS_IP_SALT`, and `AEGIS_DATABASE_CA` (the PEM of your Postgres provider's root CA, needed for Supabase's pooler so TLS verification stays on). Without a database the API returns `503 not_configured`; it never falls back to in-memory state.
 
 ## Architecture Direction
 
@@ -115,7 +129,7 @@ Aegis sits beside — not in place of — developer-facing authorization platfor
 
 ## Live
 
-[aegis-mauve-one.vercel.app](https://aegis-mauve-one.vercel.app)
+[aegis-mauve-one.vercel.app](https://aegis-mauve-one.vercel.app) · [owner console](https://aegis-mauve-one.vercel.app/console) · [self-test](https://aegis-mauve-one.vercel.app/test)
 
 ## Tech Stack
 
@@ -124,9 +138,10 @@ Aegis sits beside — not in place of — developer-facing authorization platfor
 | Framework | Next.js 15 (App Router) |
 | UI | React 18, TypeScript, Tailwind CSS 3 |
 | Motion | Framer Motion |
-| Auth & data | Supabase (magic-link auth, Postgres with RLS) |
-| Policy API store | In-memory (prototype) |
-| Connectors | Google OAuth 2.0 (Gmail read-only) |
+| Enforcement store | Postgres (migration written for Supabase), `aegis` schema, RLS, append-only log, dedicated least-privilege role |
+| Server data access | node-postgres, one transaction per request |
+| Tests | Vitest + PGlite (real Postgres in-process) |
+| Legacy connector | Google OAuth 2.0 (Gmail read-only), offline |
 | Deployment | Vercel |
 
 ## License

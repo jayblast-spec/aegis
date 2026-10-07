@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Used only by the legacy Google OAuth connector. The build must not depend on
+// these variables, so a placeholder client is created when they are absent.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+export const supabaseConfigured = Boolean(url && anonKey)
 
-export const supabase = createClient(url, anonKey, {
+export const supabase = createClient(url || 'http://localhost:54321', anonKey || 'not-configured', {
   auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true },
 })
 

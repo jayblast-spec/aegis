@@ -1,31 +1,39 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { motion } from 'framer-motion'
-import type { Session } from '@supabase/supabase-js'
-import { supabase, type DelegationRow } from '@/lib/supabaseClient'
-import { OAUTH_PROVIDERS, buildOAuthAuthUrl } from '@/lib/oauthProviders'
 import { SiteHeader, SiteFooter } from './components/SiteChrome'
-import { SandboxLog } from './components/SandboxLog'
+import { DecisionTable } from './components/DecisionTable'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import { exportDelegationsToCSV } from './lib/exportUtils'
 import { getAgentPresets, type AgentPreset } from './lib/agentPresets'
-
-type OAuthConnectionRow = {
-  id: string
-  provider: string
-  account_email: string | null
-  scope: string
-  status: 'active' | 'revoked'
-  created_at: string
-  revoked_at: string | null
-}
+import { AegisAgent, AegisError, AegisOwner, type DecisionLogEntry, type EnforceRequest } from '@/lib/aegisSDK'
 
 type AgentDef = { id: string; label: string; icon: string }
 type LogLine = { text: string; tone: 'muted' | 'ok' | 'warn' | 'danger' }
 type SimAction = { id: string; label: string; kind: 'standard' | 'financial' | 'malicious'; cost: string; desc: string }
+
+// The sandbox runs against the live enforcement API as a throwaway owner
+// account created for this browser. Its keys live in this browser only.
+type SandboxState = { ownerKey: string; agents: Record<string, { id: string; key: string }> }
+const SANDBOX_STORAGE = 'aegis.sandbox.v1'
+
+function loadSandbox(): SandboxState | null {
+  try {
+    const raw = window.localStorage.getItem(SANDBOX_STORAGE)
+    return raw ? (JSON.parse(raw) as SandboxState) : null
+  } catch {
+    return null
+  }
+}
+function saveSandbox(s: SandboxState | null) {
+  try {
+    if (s) window.localStorage.setItem(SANDBOX_STORAGE, JSON.stringify(s))
+    else window.localStorage.removeItem(SANDBOX_STORAGE)
+  } catch {
+    /* storage unavailable: sandbox lasts for this tab only */
+  }
+}
 
 // Known agentic AI products, kept broad on purpose. Add more here as new
 // agents ship, or use "Add another agent" in the sandbox UI to register one
@@ -54,43 +62,45 @@ const simActions: SimAction[] = [
   { id: 'sim-action-3', label: 'Prompt Injection: Leak PII', kind: 'malicious', cost: 'Exfiltrate API', desc: 'Malicious instruction attempting to exfiltrate data outside the granted scope.' },
 ]
 
+const defaultScopes = {
+  email_read: true,
+  email_send: false,
+  calendar_read: true,
+  calendar_write: false,
+  drive_read: true,
+  drive_write: false,
+  banking_read: true,
+  banking_transfer: false,
+  analytics_read: true,
+  analytics_modify: false,
+  customer_data_view: true,
+  customer_data_export: false,
+  payment_processing: true,
+  vendor_apis_read: true,
+}
+
+function requestFor(action: SimAction): EnforceRequest {
+  if (action.kind === 'malicious') return { action: action.label, cost: 0, scopes: ['customer_data_export', 'exfiltrate'], params: { destination: 'unknown-host' } }
+  if (action.kind === 'financial') return { action: action.label, cost: 450, scopes: ['payment_processing'], params: { vendor: 'saas-vendor', term: 'annual' } }
+  return { action: action.label, cost: 0, scopes: ['email_read', 'calendar_read'], params: { to: 'client' } }
+}
+
 export default function Home() {
   const [agentList, setAgentList] = useState<AgentDef[]>(defaultAgents)
   const [agent, setAgent] = useState<string>(defaultAgents[0].id)
   const [customAgentName, setCustomAgentName] = useState('')
   const currentAgent = agentList.find(a => a.id === agent) ?? agentList[0]
-  const [spending, setSpending] = useState(250)
-  const [scopes, setScopes] = useState({
-    email_read: true,
-    email_send: false,
-    calendar_read: true,
-    calendar_write: false,
-    drive_read: true,
-    drive_write: false,
-    banking_read: true,
-    banking_transfer: false,
-    analytics_read: true,
-    analytics_modify: false,
-    customer_data_view: true,
-    customer_data_export: false,
-    payment_processing: false,
-    vendor_apis_read: true,
-  })
+  const [spending, setSpending] = useState(1000)
+  const [scopes, setScopes] = useState(defaultScopes)
   const [approvalTrigger, setApprovalTrigger] = useState('100')
-  const [log, setLog] = useState<LogLine[]>([{ text: '// System ready. Click any action above to test the policy simulator...', tone: 'muted' }])
+  const [log, setLog] = useState<LogLine[]>([{ text: '// Ready. Each action below is a real call to the live /api/enforce endpoint.', tone: 'muted' }])
   const [banner, setBanner] = useState<{ text: string; tone: 'idle' | 'ok' | 'warn' | 'danger' }>({ text: 'Waiting for agent action...', tone: 'idle' })
   const [approval, setApproval] = useState<{ open: boolean; desc: string }>({ open: false, desc: '' })
-  const [pendingAction, setPendingAction] = useState<{ agentId: string; actionLabel: string; cost: number } | null>(null)
+  const [held, setHeld] = useState<{ actionId: string; agentKey: string; req: EnforceRequest } | null>(null)
   const [killed, setKilled] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [clock, setClock] = useState('')
-
-  const [session, setSession] = useState<Session | null>(null)
-  const [authEmail, setAuthEmail] = useState('')
-  const [authStatus, setAuthStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
-  const [delegation, setDelegation] = useState<DelegationRow | null>(null)
-  const [delegationBusy, setDelegationBusy] = useState(false)
-  const [oauthConnections, setOauthConnections] = useState<OAuthConnectionRow[]>([])
-  const [oauthBusyProvider, setOauthBusyProvider] = useState<string | null>(null)
+  const [serverLog, setServerLog] = useState<DecisionLogEntry[]>([])
 
   useEffect(() => {
     setClock(new Date().toLocaleTimeString('en-US', { hour12: true }))
@@ -98,38 +108,19 @@ export default function Home() {
     return () => clearInterval(t)
   }, [])
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
-    return () => sub.subscription.unsubscribe()
+  const refreshServerLog = useCallback(async () => {
+    const s = loadSandbox()
+    if (!s) return
+    try {
+      setServerLog(await new AegisOwner(s.ownerKey).decisions({ limit: 30 }))
+    } catch {
+      /* log panel is best-effort */
+    }
   }, [])
 
   useEffect(() => {
-    if (!session) { setDelegation(null); return }
-    supabase
-      .from('delegations')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setDelegation(data as DelegationRow)
-          setKilled(data.status === 'revoked')
-        }
-      })
-  }, [session])
-
-  useEffect(() => {
-    if (!session) { setOauthConnections([]); return }
-    supabase
-      .from('oauth_connections')
-      .select('id, provider, account_email, scope, status, created_at, revoked_at')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setOauthConnections((data as OAuthConnectionRow[]) ?? []))
-  }, [session])
+    refreshServerLog()
+  }, [refreshServerLog])
 
   // Form validation state
   const [validation, setValidation] = useState<{ field: string; message: string } | null>(null)
@@ -161,261 +152,160 @@ export default function Home() {
   // Keyboard shortcuts
   useKeyboardShortcuts({
     '?': () => {
-      setLog(prev => [...prev, { text: '// Available shortcuts: R=Reset, E=Export, S=Submit action', tone: 'muted' }])
+      setLog(prev => [...prev, { text: '// Available shortcuts: R=Reset sandbox controls', tone: 'muted' }])
     },
     'r': () => {
-      const defaultScopes = {
-        email_read: true,
-        email_send: false,
-        calendar_read: true,
-        calendar_write: false,
-        drive_read: true,
-        drive_write: false,
-        banking_read: true,
-        banking_transfer: false,
-        analytics_read: true,
-        analytics_modify: false,
-        customer_data_view: true,
-        customer_data_export: false,
-        payment_processing: false,
-        vendor_apis_read: true,
-      }
       setAgent(defaultAgents[0].id)
-      setSpending(250)
+      setSpending(1000)
       setApprovalTrigger('100')
       setScopes(defaultScopes)
-      setLog([{ text: '// System ready. Sandbox reset.', tone: 'muted' }])
+      setLog([{ text: '// Sandbox controls reset.', tone: 'muted' }])
       setBanner({ text: 'Sandbox reset', tone: 'ok' })
     },
-    'e': () => {
-      if (delegation) {
-        const exportData = {
-          id: delegation.id,
-          provider: delegation.agent_name || 'Unknown',
-          account_email: null,
-          scope: 'mixed',
-          status: delegation.status as 'active' | 'revoked',
-          created_at: delegation.created_at,
-          revoked_at: delegation.revoked_at,
-        }
-        exportDelegationsToCSV([exportData])
-        setBanner({ text: 'Delegation exported to CSV', tone: 'ok' })
-      } else {
-        setBanner({ text: 'No delegation to export', tone: 'warn' })
-      }
-    },
   })
-
-  function connectionFor(providerId: string) {
-    return oauthConnections.find(c => c.provider === providerId && c.status === 'active') ?? null
-  }
-
-  function connectRealAccount(providerId: string) {
-    if (typeof window === 'undefined') return
-    window.location.href = buildOAuthAuthUrl(providerId, window.location.origin)
-  }
-
-  async function revokeRealConnection(connectionId: string, providerLabel: string) {
-    if (!session) return
-    setOauthBusyProvider(connectionId)
-    const res = await fetch('/api/oauth/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ connectionId }),
-    })
-    const json = await res.json()
-    setOauthBusyProvider(null)
-    if (res.ok) {
-      setOauthConnections(list => list.map(c => c.id === connectionId ? { ...c, status: 'revoked', revoked_at: new Date().toISOString() } : c))
-      const t = timestamp()
-      setLog(l => [...l, { text: `[${t}] REVOKED — ${providerLabel}'s own OAuth server invalidated the token${json.providerRevokeOk ? '' : ' (local record updated; provider call did not confirm)'}. This is a real, independently checkable revoke.`, tone: 'danger' }])
-    }
-  }
-
-  async function sendMagicLink() {
-    if (!authEmail) return
-    setAuthStatus('sending')
-    const { error } = await supabase.auth.signInWithOtp({
-      email: authEmail,
-      options: { emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
-    })
-    setAuthStatus(error ? 'error' : 'sent')
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-    setDelegation(null)
-    setKilled(false)
-  }
-
-  async function saveRealDelegation() {
-    if (!session) return
-    setDelegationBusy(true)
-    const { data, error } = await supabase
-      .from('delegations')
-      .insert({
-        user_id: session.user.id,
-        agent_name: currentAgent.label,
-        scope_email: scopes.email_read || scopes.email_send,
-        scope_bank: scopes.banking_read || scopes.banking_transfer,
-        scope_pii: scopes.customer_data_view || scopes.customer_data_export,
-        spending_cap_cents: spending * 100,
-        approval_trigger_cents: approvalTrigger === 'always' ? 0 : Number(approvalTrigger) * 100,
-      })
-      .select()
-      .single()
-    setDelegationBusy(false)
-    if (!error && data) {
-      setDelegation(data as DelegationRow)
-      setKilled(false)
-      const t = timestamp()
-      setLog(l => [...l, { text: `[${t}] Real delegation saved to your account for ${currentAgent.label}. This persists across refresh.`, tone: 'ok' }])
-    }
-  }
-
-  async function revokeRealDelegation() {
-    if (!session || !delegation) return
-    setDelegationBusy(true)
-    const { error } = await supabase
-      .from('delegations')
-      .update({ status: 'revoked', revoked_at: new Date().toISOString() })
-      .eq('id', delegation.id)
-      .eq('user_id', session.user.id)
-    if (!error) {
-      await supabase.from('delegation_events').insert({
-        delegation_id: delegation.id,
-        user_id: session.user.id,
-        event_type: 'revoked',
-        detail: 'Revoked by user from sandbox kill switch',
-      })
-      setDelegation({ ...delegation, status: 'revoked', revoked_at: new Date().toISOString() })
-      setKilled(true)
-      const t = timestamp()
-      setLog(l => [...l, { text: `[${t}] REVOKED — your real delegation to ${delegation.agent_name} was updated in your account. This survives a refresh.`, tone: 'danger' }])
-    }
-    setDelegationBusy(false)
-  }
 
   function timestamp() {
     return new Date().toLocaleTimeString('en-US', { hour12: true })
   }
 
+  /** Creates (once per browser) a throwaway owner, and one Aegis agent per sandbox agent. */
+  async function ensureSandboxAgent(def: AgentDef, allowCreate: boolean): Promise<{ owner: AegisOwner; agentId: string; agentKey: string }> {
+    let s = loadSandbox()
+    if (s) {
+      try {
+        await new AegisOwner(s.ownerKey).listAgents()
+      } catch (err) {
+        if (err instanceof AegisError && err.status === 401) s = null
+        else throw err
+      }
+    }
+    if (!s) {
+      const created = await AegisOwner.create('Sandbox visitor')
+      s = { ownerKey: created.ownerKey, agents: {} }
+      saveSandbox(s)
+    }
+    const owner = new AegisOwner(s.ownerKey)
+    if (!s.agents[def.id]) {
+      if (!allowCreate) throw new Error(`Kill switch is on: no key exists for ${def.label} and none will be issued until you restore access`)
+      const { agent: a, agentKey } = await owner.createAgent(def.label.slice(0, 80))
+      s = { ...s, agents: { ...s.agents, [def.id]: { id: a.id, key: agentKey } } }
+      saveSandbox(s)
+    }
+    return { owner, agentId: s.agents[def.id].id, agentKey: s.agents[def.id].key }
+  }
+
   async function runAction(action: SimAction) {
+    if (busy) return
+    setBusy(true)
     const t = timestamp()
-    const userId = 'user-' + (authEmail || 'demo')
-    const agentId = agent
-
-    // Map scopes to enforcement API format
-    const enabledScopes = Object.entries(scopes)
-      .filter(([_, enabled]) => enabled)
-      .map(([scope]) => scope)
-
-    // Map action to cost
-    let actionCost = 0
-    let actionScopes: string[] = []
-    if (action.kind === 'malicious') {
-      actionCost = 0
-      actionScopes = ['exfiltrate', 'leak_pii']
-    } else if (action.kind === 'financial') {
-      actionCost = 450
-      actionScopes = ['banking_transfer', 'payment_processing']
-    } else {
-      actionCost = 0
-      actionScopes = ['email_read', 'calendar_read']
-    }
-
-    // Set policy if not already set
     try {
-      await fetch('/api/policies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          agentId,
-          policy: {
-            spendingCap: spending,
-            approvalThreshold: Number(approvalTrigger),
-            allowedScopes: enabledScopes,
-          },
-        }),
-      })
-    } catch (e) {
-      console.error('Policy set error:', e)
-    }
-
-    // Call enforcement API
-    setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → "${action.label}"`, tone: 'muted' }])
-
-    try {
-      const response = await fetch('/api/enforce', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          agentId,
-          action: action.label,
-          cost: actionCost,
-          scopes: actionScopes,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (result.decision.decision === 'ALLOWED') {
-        setLog(l => [...l, { text: `[${t}] ALLOWED — within daily limit ($${spending}/day).`, tone: 'ok' }])
+      const { owner, agentId, agentKey } = await ensureSandboxAgent(currentAgent, !killed)
+      const enabledScopes = Object.entries(scopes).filter(([, enabled]) => enabled).map(([scope]) => scope)
+      // Revoked agents keep their (dead) key so you can watch the server block them; policy edits are skipped.
+      if (!killed) {
+        await owner.setPolicy(agentId, {
+          perActionCap: spending,
+          windowCap: spending,
+          windowSeconds: 86_400,
+          approvalThreshold: approvalTrigger === 'always' ? null : Number(approvalTrigger),
+          alwaysRequireApproval: approvalTrigger === 'always',
+          allowedScopes: enabledScopes,
+        })
+      }
+      const req = requestFor(action)
+      setLog(l => [...l, { text: `[${t}] ${currentAgent.label} → POST /api/enforce "${action.label}"`, tone: 'muted' }])
+      const result = await new AegisAgent(agentKey).enforce(req)
+      const verdict = result.decision.decision
+      if (verdict === 'ALLOWED') {
+        setLog(l => [...l, { text: `[${t}] 200 ALLOWED: ${result.reason}`, tone: 'ok' }])
         setBanner({ text: `Allowed: ${action.label}`, tone: 'ok' })
-      } else if (result.decision.decision === 'REQUIRES_APPROVAL') {
-        const actionId = `${agentId}-${Date.now()}`
-        setPendingAction({ agentId, actionLabel: action.label, cost: actionCost })
-        setLog(l => [...l, { text: `[${t}] SUSPENDED — exceeds approval threshold ($${approvalTrigger}). Awaiting your decision.`, tone: 'warn' }])
-        setBanner({ text: 'Awaiting mandatory approval...', tone: 'warn' })
-        setApproval({ open: true, desc: `Agent requested action costing $${actionCost.toFixed(2)} exceeding your threshold ($${approvalTrigger}). Action suspended pending your decision.` })
-      } else if (result.decision.decision === 'BLOCKED') {
-        setLog(l => [...l, { text: `[${t}] BLOCKED — ${result.reason}`, tone: 'danger' }])
+      } else if (verdict === 'REQUIRES_APPROVAL' && result.pendingActionId) {
+        const pendingId = result.pendingActionId
+        setHeld({ actionId: pendingId, agentKey, req })
+        setLog(l => [...l, { text: `[${t}] 202 HELD: ${result.reason} Pending action ${pendingId.slice(0, 8)}… queued for you.`, tone: 'warn' }])
+        setBanner({ text: 'Held for your approval', tone: 'warn' })
+        setApproval({ open: true, desc: `${currentAgent.label} requested "${action.label}" ($${(req.cost ?? 0).toFixed(2)}). The server is holding it until you decide.` })
+      } else {
+        setLog(l => [...l, { text: `[${t}] 403 BLOCKED: ${result.reason}`, tone: 'danger' }])
         setBanner({ text: `Blocked: ${action.label}`, tone: 'danger' })
       }
     } catch (e) {
-      console.error('Enforcement error:', e)
-      setLog(l => [...l, { text: `[${t}] ERROR — enforcement check failed`, tone: 'danger' }])
+      const msg = e instanceof Error ? e.message : 'enforcement check failed'
+      setLog(l => [...l, { text: `[${t}] ERROR: ${msg}`, tone: 'danger' }])
       setBanner({ text: 'Enforcement error', tone: 'danger' })
+    } finally {
+      setBusy(false)
+      refreshServerLog()
     }
   }
 
   async function decide(approved: boolean) {
+    const s = loadSandbox()
+    if (!held || !s) return
+    setBusy(true)
     const t = timestamp()
-    const userId = 'user-' + (authEmail || 'demo')
-
-    if (pendingAction) {
-      // Submit approval decision to backend
-      try {
-        await fetch('/api/approvals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            agentId: pendingAction.agentId,
-            action: pendingAction.actionLabel,
-            actionId: `${pendingAction.agentId}-${Date.now()}`,
-            approved,
-          }),
-        })
-      } catch (e) {
-        console.error('Approval submission error:', e)
+    try {
+      await new AegisOwner(s.ownerKey).decide(held.actionId, approved)
+      if (!approved) {
+        setLog(l => [...l, { text: `[${t}] You denied it. The held action can never be released.`, tone: 'danger' }])
+        setBanner({ text: 'Denied by you', tone: 'danger' })
+      } else {
+        setLog(l => [...l, { text: `[${t}] You approved it. The agent now polls for its single-use release token…`, tone: 'ok' }])
+        const agentClient = new AegisAgent(held.agentKey)
+        const state = await agentClient.poll(held.actionId)
+        if (state.approvalToken) {
+          const released = await agentClient.enforce({ ...held.req, approvalToken: state.approvalToken })
+          setLog(l => [...l, { text: `[${t}] ${released.allowed ? '200 RELEASED' : '403 BLOCKED'}: ${released.reason}`, tone: released.allowed ? 'ok' : 'danger' }])
+          const replay = await agentClient.enforce({ ...held.req, approvalToken: state.approvalToken })
+          setLog(l => [...l, { text: `[${t}] Replay of the same token → ${replay.decision.decision}: ${replay.reason}`, tone: replay.allowed ? 'warn' : 'muted' }])
+          setBanner({ text: released.allowed ? 'Approved and released once' : 'Release blocked', tone: released.allowed ? 'ok' : 'danger' })
+        } else {
+          setLog(l => [...l, { text: `[${t}] Action is ${state.status}; nothing to release.`, tone: 'warn' }])
+        }
       }
+    } catch (e) {
+      setLog(l => [...l, { text: `[${t}] ERROR: ${e instanceof Error ? e.message : 'decision failed'}`, tone: 'danger' }])
+    } finally {
+      setApproval({ open: false, desc: '' })
+      setHeld(null)
+      setBusy(false)
+      refreshServerLog()
     }
+  }
 
-    if (approved) {
-      setLog(l => [...l, { text: `[${t}] You approved the suspended action.`, tone: 'ok' }])
-      setBanner({ text: 'Approved by you', tone: 'ok' })
-    } else {
-      setLog(l => [...l, { text: `[${t}] You rejected the suspended action.`, tone: 'danger' }])
-      setBanner({ text: 'Rejected by you', tone: 'danger' })
+  async function killSwitch() {
+    const s = loadSandbox()
+    const t = timestamp()
+    if (!s) {
+      setLog(l => [...l, { text: `[${t}] No sandbox agents exist yet; nothing to revoke.`, tone: 'muted' }])
+      return
     }
-    setApproval({ open: false, desc: '' })
-    setPendingAction(null)
+    setBusy(true)
+    try {
+      const revoked = await new AegisOwner(s.ownerKey).revokeAll()
+      setKilled(true)
+      setApproval({ open: false, desc: '' })
+      setHeld(null)
+      setLog(l => [...l, { text: `[${t}] KILL SWITCH: ${revoked.length} agent key(s) revoked on the server. Try an action: /api/enforce now returns 403.`, tone: 'danger' }])
+      setBanner({ text: 'All sandbox agents revoked', tone: 'danger' })
+    } catch (e) {
+      setLog(l => [...l, { text: `[${t}] ERROR: ${e instanceof Error ? e.message : 'revoke failed'}`, tone: 'danger' }])
+    } finally {
+      setBusy(false)
+      refreshServerLog()
+    }
+  }
+
+  function restoreAccess() {
+    const s = loadSandbox()
+    // Revoked keys stay revoked forever; restoring means issuing fresh agents.
+    if (s) saveSandbox({ ...s, agents: {} })
+    setKilled(false)
+    setLog(l => [...l, { text: `[${timestamp()}] Fresh agent keys will be issued on the next action. The revoked keys stay dead.`, tone: 'muted' }])
   }
 
   const toneClass: Record<string, string> = { muted: 'text-gray-500', ok: 'text-emerald-400', warn: 'text-amber-400', danger: 'text-rose-400' }
+
 
   return (
     <>
@@ -432,7 +322,7 @@ export default function Home() {
               <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <i data-lucide="zap" className="w-3.5 h-3.5" />
-                  <span>LIVE ENFORCEMENT BACKEND — PRODUCTION API</span>
+                  <span>EARLY BUILD — LIVE ENFORCEMENT API</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
                   Set Portable, Enforceable <br className="hidden sm:block" />
@@ -475,11 +365,11 @@ export default function Home() {
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-emerald-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Live</div>
-                    <div className="text-xs text-gray-400">Sandbox runs in your browser</div>
+                    <div className="text-xs text-gray-400">Sandbox calls the real API</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-cyan-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Local-only</div>
-                    <div className="text-xs text-gray-400">No data leaves this page</div>
+                    <div className="text-2xl font-bold text-cyan-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Logged</div>
+                    <div className="text-xs text-gray-400">Append-only decision log</div>
                   </div>
                 </div>
               </div>
@@ -566,28 +456,12 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl mx-auto">
               <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/60 space-y-3">
-                {session ? (
-                  <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/60 text-xs text-gray-400 flex items-center justify-between" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    <span>Signed in as <span className="text-emerald-400">{session.user.email}</span></span>
-                    <button onClick={signOut} className="text-gray-500 hover:text-white">Sign out</button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-xs text-gray-400">Sign in to make your delegation and kill switch real — persisted to your account, not just this browser tab.</p>
-                    <div className="flex gap-2">
-                      <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@email.com" className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:border-emerald-500 focus:outline-none" />
-                      <button onClick={sendMagicLink} disabled={authStatus === 'sending'} className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-50">
-                        {authStatus === 'sending' ? 'Sending…' : 'Send magic link'}
-                      </button>
-                    </div>
-                    {authStatus === 'sent' && <p className="text-[11px] text-emerald-400">Check your email for a sign-in link.</p>}
-                    {authStatus === 'error' && <p className="text-[11px] text-rose-400">Couldn&rsquo;t send the link — try again.</p>}
-                    <button onClick={() => setKilled(k => !k)} className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase group ${killed ? 'bg-gray-800 text-gray-300' : 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50'}`}>
-                      <i data-lucide="power" className="w-5 h-5" />
-                      <span>{killed ? 'Restore Agent Access' : 'Revoke All Agent Access (live enforcement)'}</span>
-                    </button>
-                  </div>
-                )}
+                <p className="text-xs text-gray-400">The sandbox below talks to the live enforcement API. On your first action it creates a throwaway owner account and one API key per agent you try, kept in this browser. The kill switch revokes those keys on the server, so every later call is refused there, not just greyed out here.</p>
+                <button onClick={killed ? restoreAccess : killSwitch} disabled={busy} className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase group disabled:opacity-50 ${killed ? 'bg-gray-800 text-gray-300' : 'bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50'}`}>
+                  <i data-lucide="power" className="w-5 h-5" />
+                  <span>{killed ? 'Issue Fresh Agent Keys' : 'Revoke All Agent Access (server-side)'}</span>
+                </button>
+                <p className="text-[11px] text-gray-500">Want your own durable account, agent keys and approval queue? Use the <Link href="/console" className="text-emerald-400 hover:underline">owner console</Link>.</p>
               </div>
             </div>
           </div>
@@ -601,7 +475,7 @@ export default function Home() {
                 <span>LIVE POLICY SIMULATOR</span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Interactive Agent Governance Sandbox</h2>
-              <p className="text-gray-300 text-base">Set boundaries, then simulate agent actions to see how Aegis&rsquo;s policy model would respond. This runs entirely in your browser — it is a design simulation, not a connection to any real AI agent.</p>
+              <p className="text-gray-300 text-base">Set boundaries, then fire sample agent actions. Each one is a real request to the live <code>/api/enforce</code> endpoint with a real agent key, decided server-side and written to a durable decision log. The actions themselves are samples: no email is sent and no money moves.</p>
             </div>
 
             <div className="grid lg:grid-cols-12 gap-8 items-start">
@@ -766,22 +640,22 @@ export default function Home() {
                 </div>
                 <div className="flex items-center gap-2 pt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   <i data-lucide="check-circle-2" className="w-3.5 h-3.5 shrink-0" />
-                  <span className="overflow-hidden text-ellipsis">Boundaries set for {currentAgent.label}: ${spending}/day · {Object.entries(scopes).filter(([_, v]) => v).length} scope{Object.entries(scopes).filter(([_, v]) => v).length !== 1 ? 's' : ''} · approval {approvalTrigger === 'always' ? 'on every action' : `over $${approvalTrigger}`}</span>
+                  <span className="overflow-hidden text-ellipsis">Boundaries set for {currentAgent.label}: ${spending}/day · {Object.entries(scopes).filter(([, v]) => v).length} scope{Object.entries(scopes).filter(([, v]) => v).length !== 1 ? 's' : ''} · approval {approvalTrigger === 'always' ? 'on every action' : `over $${approvalTrigger}`}</span>
                 </div>
               </div>
 
               <div className="lg:col-span-7 space-y-6">
                 <div className="rounded-2xl p-6 space-y-6" style={{ background: 'rgba(13,17,23,.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,.08)' }}>
                   <div className="flex items-center justify-between border-b border-gray-800 pb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="terminal" className="w-5 h-5 text-cyan-400" />2. Simulate agent actions</h3>
-                    <span className="text-xs text-emerald-400 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Sandbox active</span>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="terminal" className="w-5 h-5 text-cyan-400" />2. Send agent actions</h3>
+                    <span className="text-xs text-emerald-400 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{killed ? 'Agents revoked' : 'Live API'}</span>
                   </div>
                   <div className="grid sm:grid-cols-3 gap-3">
                     {simActions.map((a, idx) => (
                       <motion.button
                         key={a.id}
                         onClick={() => runAction(a)}
-                        disabled={killed}
+                        disabled={busy}
                         whileHover={{ scale: 1.02, y: -2 }}
                         whileTap={{ scale: 0.98 }}
                         initial={{ opacity: 0, y: 10 }}
@@ -797,7 +671,7 @@ export default function Home() {
                   </div>
                   <div className="bg-black/80 rounded-xl p-4 border border-gray-800 text-xs space-y-3 min-h-[220px] flex flex-col justify-between overflow-hidden shadow-inner" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                     <div className="flex items-center justify-between border-b border-gray-800/80 pb-2 text-gray-500 text-[11px]">
-                      <span>AEGIS SANDBOX LOG</span>
+                      <span>AEGIS ENFORCEMENT LOG</span>
                       <span>{clock}</span>
                     </div>
                     <div className="space-y-2 text-gray-300 overflow-y-auto max-h-[160px] pr-2">
@@ -824,6 +698,7 @@ export default function Home() {
                       <div className="flex gap-3 pt-1">
                         <motion.button
                           onClick={() => decide(true)}
+                          disabled={busy}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs transition-all flex items-center gap-1.5"
@@ -832,11 +707,12 @@ export default function Home() {
                         </motion.button>
                         <motion.button
                           onClick={() => decide(false)}
+                          disabled={busy}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="px-4 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition-all flex items-center gap-1.5"
                         >
-                          <i data-lucide="x-circle" className="w-4 h-4" />Block
+                          <i data-lucide="x-circle" className="w-4 h-4" />Deny
                         </motion.button>
                       </div>
                     </motion.div>
@@ -861,7 +737,7 @@ export default function Home() {
                 { icon: 'shield-check', color: 'emerald', title: 'Access & Action Governance', body: 'Granular scope isolation. Specify exactly what APIs, files, and channels an agent can touch — regardless of which model runs it.', points: ['Scope isolation per vendor', 'Boundary defined before access'] },
                 { icon: 'dollar-sign', color: 'cyan', title: 'Spending & Time Caps', body: 'Rate limits, balance ceilings, and auto-expiring temporary delegation passes to stop runaway agent spending before it happens.', points: ['Daily / per-transaction caps', 'Auto-expiring access windows'] },
                 { icon: 'user-check', color: 'amber', title: 'Mandatory Approvals', body: 'Configurable human-in-the-loop triggers that force explicit sign-off for high-risk actions, transfers, or sensitive data exports.', points: ['Manual approval popups', 'Risk-based step-ups'] },
-                { icon: 'power', color: 'rose', title: 'One-Click Kill Switch', body: 'A visible action ledger with a single-click revoke that immediately marks an agent’s authority as void in this interface.', points: ['Single-click revoke', 'Visible, timestamped action log'] },
+                { icon: 'power', color: 'rose', title: 'One-Click Kill Switch', body: 'One click revokes an agent’s API key on the server; its very next enforcement call is blocked, and any approval it was waiting on is cancelled.', points: ['Single-click revoke', 'Visible, timestamped action log'] },
               ].map(p => (
                 <div key={p.title} className={`p-8 rounded-2xl border border-gray-800 hover:border-${p.color}-500/40 transition-all duration-300 group hover:-translate-y-1`} style={{ background: 'rgba(13,17,23,.75)', backdropFilter: 'blur(12px)' }}>
                   <div className={`w-12 h-12 rounded-xl bg-${p.color}-500/10 border border-${p.color}-500/30 flex items-center justify-center mb-6`}>
@@ -880,108 +756,40 @@ export default function Home() {
 
         <section id="receipt" className="py-20 border-y border-gray-800/80" style={{ background: 'rgba(13,17,23,.4)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid lg:grid-cols-12 gap-12 items-center">
-              <div className="lg:col-span-5 space-y-6">
+            <div className="grid lg:grid-cols-12 gap-12 items-start">
+              <div className="lg:col-span-4 space-y-6">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  <i data-lucide="file-check-2" className="w-3.5 h-3.5" /><span>ACTION LEDGER</span>
+                  <i data-lucide="file-check-2" className="w-3.5 h-3.5" /><span>DECISION LOG</span>
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Visible Receipts &amp; a Kill Switch That Persists</h2>
-                <p className="text-gray-300 text-base leading-relaxed">Sign in below and every delegation you grant is a real, database-backed record tied to your account. Revoking it updates that record for good — it survives a refresh, and it stays revoked. Without signing in, the sandbox still runs, but only as a local browser demo.</p>
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Every decision, on the record</h2>
+                <p className="text-gray-300 text-base leading-relaxed">Each enforcement decision, approval, denial and revoke is written to an append-only table in Postgres with the actor and a server timestamp. The database rejects edits and deletes to it, including from the app itself. The rows on the right are your sandbox&rsquo;s, read back from the server.</p>
                 <div className="space-y-3 pt-2">
                   <div className="p-4 rounded-xl border border-gray-800 flex items-start gap-3" style={{ background: 'rgba(13,17,23,.75)' }}>
-                    <i data-lucide="shield-alert" className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                    <div><h4 className="text-sm font-bold text-white">Real revoke, honestly scoped</h4><p className="text-xs text-gray-400">Signed in, revoke really does mark your delegation record void in Aegis&rsquo;s database, protected by row-level security so only you can read or change it. It does not call OpenAI, Google, or any other provider&rsquo;s API — no such live integration exists yet.</p></div>
+                    <i data-lucide="key-round" className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    <div><h4 className="text-sm font-bold text-white">Single-use approvals</h4><p className="text-xs text-gray-400">Approving a held action mints one token bound to the hash of that exact request. A different amount, recipient or agent is refused, and a second use is refused.</p></div>
                   </div>
                   <div className="p-4 rounded-xl border border-gray-800 flex items-start gap-3" style={{ background: 'rgba(13,17,23,.75)' }}>
-                    <i data-lucide="file-text" className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-                    <div><h4 className="text-sm font-bold text-white">Plain, readable receipts</h4><p className="text-xs text-gray-400">Each entry records the agent, the action, the decision, and the time — no cryptographic signing is implemented in this build.</p></div>
+                    <i data-lucide="shield-alert" className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                    <div><h4 className="text-sm font-bold text-white">Honest limits</h4><p className="text-xs text-gray-400">Aegis decides; it does not intercept. An agent that never calls the API is not stopped, and log entries are not cryptographically signed yet.</p></div>
                   </div>
                 </div>
-                <div className="pt-4 space-y-3">
-                  {session && delegation && delegation.status === 'active' && (
-                    <button onClick={revokeRealDelegation} disabled={delegationBusy} className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 hover:shadow-rose-600/50 disabled:opacity-50">
-                      <i data-lucide="power" className="w-5 h-5" />
-                      <span>{delegationBusy ? 'Revoking…' : `Revoke Real Delegation (${delegation.agent_name})`}</span>
-                    </button>
-                  )}
-                  {session && (!delegation || delegation.status === 'revoked') && (
-                    <button onClick={saveRealDelegation} disabled={delegationBusy} className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 tracking-wider uppercase bg-gray-900 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50">
-                      <i data-lucide="shield-check" className="w-5 h-5" />
-                      <span>{delegationBusy ? 'Saving…' : `Grant Real Delegation to ${currentAgent.label}`}</span>
-                    </button>
-                  )}
-
-                  {session && (
-                    <div className="space-y-3">
-                      <p className="text-[11px] text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>REAL CONNECTIONS — each of these calls a real provider&rsquo;s OAuth server, not just Aegis&rsquo;s own database. More providers plug into this same list over time.</p>
-                      {Object.values(OAUTH_PROVIDERS).map(provider => {
-                        const revokedConnection = oauthConnections.find(c => c.provider === provider.id && c.status === 'revoked')
-                        const active = connectionFor(provider.id)
-                        const busy = oauthBusyProvider === active?.id
-                        return (
-                          <div key={provider.id} className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 space-y-3">
-                            <div className="flex items-center gap-2 text-xs text-cyan-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                              <i data-lucide={provider.icon} className="w-4 h-4" />
-                              <span>{provider.label}</span>
-                            </div>
-                            {active ? (
-                              <>
-                                <p className="text-xs text-gray-400">Connected as <span className="text-white">{active.account_email ?? 'your account'}</span>. Revoking below calls the real OAuth revoke endpoint — independently verifiable, not just a database flag.</p>
-                                <button onClick={() => revokeRealConnection(active.id, provider.label)} disabled={busy} className="w-full py-3 px-6 rounded-xl font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-rose-600 to-red-700 text-white disabled:opacity-50">
-                                  {busy ? 'Revoking…' : `Revoke Real ${provider.label} Access`}
-                                </button>
-                              </>
-                            ) : revokedConnection ? (
-                              <>
-                                <p className="text-xs text-emerald-400">Revoked — this connection has been cut off for good. Connect again to test another round.</p>
-                                <button onClick={() => connectRealAccount(provider.id)} className="w-full py-3 px-6 rounded-xl font-bold text-xs uppercase tracking-wider bg-gray-900 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10">
-                                  Connect {provider.label} (real)
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-xs text-gray-400">Not connected yet. Aegis requests real, scoped access via {provider.label.split(' (')[0]}&rsquo;s actual OAuth flow, and the revoke button actually calls it to invalidate the token.</p>
-                                <button onClick={() => connectRealAccount(provider.id)} className="w-full py-3 px-6 rounded-xl font-bold text-xs uppercase tracking-wider bg-gray-900 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10">
-                                  Connect {provider.label} (real)
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
+                <Link href="/console" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gray-900 border border-emerald-500/40 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/10">
+                  <i data-lucide="layout-dashboard" className="w-4 h-4" />Open the owner console
+                </Link>
               </div>
-              <div className="lg:col-span-7">
+              <div className="lg:col-span-8">
                 <div className="rounded-2xl p-6 border border-gray-800 relative overflow-hidden" style={{ background: 'rgba(13,17,23,.75)', backdropFilter: 'blur(12px)' }}>
                   <div className="flex items-center justify-between pb-4 border-b border-gray-800 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    <span className="text-gray-400 flex items-center gap-2"><i data-lucide="list-tree" className="w-4 h-4 text-emerald-400" />LIVE SANDBOX LOG</span>
-                    <span className="text-emerald-400 font-bold">{killed ? 'HALTED' : 'RUNNING'}</span>
+                    <span className="text-gray-400 flex items-center gap-2"><i data-lucide="list-tree" className="w-4 h-4 text-emerald-400" />SERVER DECISION LOG</span>
+                    <span className={killed ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>{killed ? 'AGENTS REVOKED' : 'RUNNING'}</span>
                   </div>
-                  <div className="mt-4 space-y-3 text-xs max-h-[380px] overflow-y-auto pr-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    {log.length <= 1 ? (
-                      <div className="text-gray-500 p-3">No actions run yet — try the sandbox above.</div>
-                    ) : log.map((l, i) => (
-                      <div key={i} className={`p-3 rounded-xl bg-gray-900/90 border border-gray-800 ${toneClass[l.tone]}`}>{l.text}</div>
-                    ))}
+                  <div className="mt-4 max-h-[420px] overflow-y-auto">
+                    {serverLog.length === 0 ? (
+                      <div className="text-gray-500 p-3 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>No entries yet. Run an action in the sandbox above.</div>
+                    ) : (
+                      <DecisionTable rows={serverLog} />
+                    )}
                   </div>
-                  {killed && (
-                    <div className="absolute inset-0 bg-rose-950/90 backdrop-blur-md p-8 flex flex-col items-center justify-center text-center space-y-4 z-20">
-                      <div className="w-16 h-16 rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center"><i data-lucide="shield-off" className="w-8 h-8 text-rose-500" /></div>
-                      <h3 className="text-2xl font-extrabold text-white tracking-wider">{session && delegation ? 'DELEGATION REVOKED' : 'SANDBOX LOCKED DOWN'}</h3>
-                      <p className="text-xs text-rose-200 max-w-md" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        {session && delegation
-                          ? 'This is permanent for this delegation record — it stays revoked even after a refresh. Grant a fresh delegation below to continue testing.'
-                          : "This demo agent's authority has been marked void in the interface."}
-                      </p>
-                      {session && delegation ? (
-                        <button onClick={saveRealDelegation} disabled={delegationBusy} className="px-6 py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-50" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{delegationBusy ? 'Saving…' : 'Grant New Delegation'}</button>
-                      ) : (
-                        <button onClick={() => setKilled(false)} className="px-6 py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-gray-200 transition-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Restore Sandbox</button>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

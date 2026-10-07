@@ -1,263 +1,150 @@
-# Aegis Enforcement Backend API
+# Aegis Enforcement API
 
 ## Overview
 
-Aegis provides a prototype policy-check API for AI agent governance. Requests are evaluated server-side against stored rules, but the API is unauthenticated, policies are held in server memory (reset on redeploy, not shared across serverless instances), and agents must choose to call it. Do not rely on it as a security control yet.
+An owner sets limits for each agent once. Each agent authenticates with its own API key and calls `POST /api/enforce` before acting; the answer is `ALLOWED`, `REQUIRES_APPROVAL` (held for the owner) or `BLOCKED`. Approvals release exactly one matching action, revoke takes effect on the next call, and every decision lands in an append-only log.
 
-Live at: `https://aegis-mauve-one.vercel.app`
+**Stage:** early build. Not externally audited. Aegis is a checkpoint, not an interceptor: an agent that never calls it, or ignores a `403`, is not stopped.
 
-## Quick Start
+Base URL: `https://aegis-mauve-one.vercel.app`. All bodies are JSON (max 16 KB). All responses carry `Cache-Control: no-store`. Errors are `{ "error": string, "code": string }`.
 
-### 1. Set a Policy
+## Authentication
 
-Configure spending caps, approval thresholds, and scope permissions for an agent:
+| Key | Prefix | Used for | Storage |
+|---|---|---|---|
+| Owner key | `aeg_own_` | policies, agents, approvals, revoke, decision log | SHA-256 hash only |
+| Agent key | `aeg_agt_` | `/api/enforce`, `/api/actions/:id` | SHA-256 hash only |
+| Approval token | `aeg_apv_` | releasing one approved action, once | SHA-256 hash only |
 
-```bash
-curl -X POST https://aegis-mauve-one.vercel.app/api/policies \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "your-user-id",
-    "agentId": "your-agent-id",
-    "policy": {
-      "spendingCap": 100,
-      "approvalThreshold": 50,
-      "allowedScopes": ["read", "write", "query"]
-    }
-  }'
+Send keys as `Authorization: Bearer <key>`. Keys are 256-bit random values and are shown exactly once. A wrong, unknown or wrong-type key returns `401`.
+
+## Endpoints
+
+### `POST /api/owners` (no auth)
+
+Creates an owner account. Rate-limited per network (10 per hour by default).
+
+```json
+{ "label": "me" }
 ```
+`201 { "ownerId": "uuid", "ownerKey": "aeg_own_…", "label": "me" }` · `429 rate_limited`
 
-**Response:**
+### `POST /api/agents` (owner) · `GET /api/agents` (owner)
+
+`POST { "name": "billing-agent" }` → `201 { "agent": {…}, "agentKey": "aeg_agt_…" }`. `GET` lists the owner's agents with status and policy.
+
+### `PUT /api/policies` (owner; `POST` is an alias)
+
 ```json
 {
-  "success": true,
-  "message": "Policy stored for agent your-agent-id",
+  "agentId": "uuid",
   "policy": {
-    "spendingCap": 100,
-    "approvalThreshold": 50,
-    "allowedScopes": ["read", "write", "query"],
-    "updatedAt": "2026-09-23T00:02:13.426Z"
+    "perActionCap": 500,
+    "windowCap": 600,
+    "windowSeconds": 86400,
+    "approvalThreshold": 100,
+    "alwaysRequireApproval": false,
+    "allowedScopes": ["payments", "read"]
   }
 }
 ```
 
-### 2. Enforce an Action
+| Field | Meaning | Default |
+|---|---|---|
+| `perActionCap` | Max cost of one action, in dollars (`spendingCap` accepted as an alias) | required |
+| `windowCap` | Max total allowed + released spend within the rolling window | `perActionCap` |
+| `windowSeconds` | Rolling window length, 60 to 2,592,000 | `86400` |
+| `approvalThreshold` | Actions costing more than this are held; `null` = never | `null` |
+| `alwaysRequireApproval` | Hold every action | `false` |
+| `allowedScopes` | Allow-list; any other requested scope is blocked | `[]` |
 
-Before performing any action, an agent checks if it's permitted:
+`200 { "agentId", "policy" }`. `404` if the agent does not belong to the caller. `GET /api/policies?agentId=…` reads one; without `agentId` it lists all of the owner's.
 
-```bash
-curl -X POST https://aegis-mauve-one.vercel.app/api/enforce \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "your-user-id",
-    "agentId": "your-agent-id",
-    "action": "run_query",
-    "cost": 25,
-    "scopes": ["read", "query"]
-  }'
-```
+### `POST /api/enforce` (agent)
 
-**Possible Responses:**
-
-#### ✅ Action Allowed (200)
 ```json
-{
-  "allowed": true,
-  "reason": "Within policy limits",
-  "decision": {
-    "timestamp": "2026-09-23T00:02:13.705Z",
-    "agentId": "your-agent-id",
-    "action": "run_query",
-    "decision": "ALLOWED"
-  }
-}
+{ "action": "pay_invoice", "cost": 450, "scopes": ["payments"], "params": { "invoice": "INV-1" } }
 ```
 
-#### ⚠️ Requires Approval (202)
+`params` is optional free-form JSON (max 8 KB) describing the exact action; it is part of the payload hash.
+
+Decision order: agent revoked → no policy (fail closed) → per-action cap → scopes → rolling window → approval rule.
+
+| Status | Decision | Body extras |
+|---|---|---|
+| `200` | `ALLOWED` | `released: true` when an approval token was consumed |
+| `202` | `REQUIRES_APPROVAL` | `pendingActionId`, `expiresAt` |
+| `403` | `BLOCKED` | `reason` explains which rule |
+
 ```json
 {
   "allowed": false,
   "requiresApproval": true,
-  "reason": "Cost $75 exceeds approval threshold $50. Human approval required.",
-  "decision": {
-    "timestamp": "2026-09-23T00:02:13.924Z",
-    "agentId": "your-agent-id",
-    "action": "write_data",
-    "decision": "REQUIRES_APPROVAL"
-  }
+  "reason": "Cost $450.00 exceeds approval threshold $100.00. Human approval required.",
+  "pendingActionId": "uuid",
+  "expiresAt": "2026-10-07T19:15:00.000Z",
+  "logId": "42",
+  "decision": { "timestamp": "…", "agentId": "uuid", "action": "pay_invoice", "decision": "REQUIRES_APPROVAL" }
 }
 ```
 
-#### ❌ Action Blocked (403)
-```json
-{
-  "allowed": false,
-  "reason": "Cost $150 exceeds spending cap $100",
-  "decision": {
-    "timestamp": "2026-09-23T00:02:13.924Z",
-    "agentId": "your-agent-id",
-    "action": "expensive_operation",
-    "decision": "BLOCKED"
-  }
-}
-```
+To release an approved action, send the **identical** request plus `"approvalToken": "aeg_apv_…"`. The server checks the token belongs to this agent, the action is approved and not expired, the request hash matches, and the hard limits (caps, scopes, window) still hold; then it atomically marks the action consumed. A mismatched payload is refused without consuming the token; a second use is refused as a replay.
 
-### 3. Retrieve Existing Policies
+### `GET /api/actions/:id` (agent)
+
+Poll a held action. Status is one of `pending`, `approved`, `denied`, `expired`, `consumed`, `cancelled`. The first poll after approval returns `approvalToken` once; later polls return `tokenIssued: true` without it. Revoked agents get `403`.
+
+### `GET /api/approvals?status=pending` (owner) · `POST /api/approvals` (owner)
+
+`GET` lists held actions (`status` can be any state or `all`). `POST { "actionId": "uuid", "approve": true | false }` decides one. `409` if it is no longer pending, has expired, or the agent was revoked. Held actions expire after 15 minutes; approvals must be released within 10 minutes.
+
+### `POST /api/agents/:id/revoke` (owner) · `POST /api/agents/revoke-all` (owner)
+
+Revokes one agent, or every active agent of the owner (kill switch). The agent's open approvals are cancelled and its next `/api/enforce` call returns `403 BLOCKED`. Revoked keys cannot be reactivated; register a new agent instead.
+
+### `GET /api/decisions?limit=50&agentId=…` (owner)
+
+Newest-first decision log: `eventType` (`enforce`, `release`, `approve`, `deny`, `expire`, `revoke`, `policy_set`, `agent_created`), `decision`, `reason`, `actorType` (`owner`, `agent`, `system`), `actorId`, `action`, `amount`, `payloadHash`, `createdAt`.
+
+## End-to-end with curl
 
 ```bash
-# Get all policies for a user
-curl "https://aegis-mauve-one.vercel.app/api/policies?userId=your-user-id"
-
-# Get specific agent policy
-curl "https://aegis-mauve-one.vercel.app/api/policies?userId=your-user-id&agentId=your-agent-id"
+BASE=https://aegis-mauve-one.vercel.app
+OWNER_KEY=$(curl -s -X POST $BASE/api/owners -H 'Content-Type: application/json' -d '{}' | jq -r .ownerKey)
+AGENT=$(curl -s -X POST $BASE/api/agents -H "Authorization: Bearer $OWNER_KEY" -H 'Content-Type: application/json' -d '{"name":"demo"}')
+AGENT_ID=$(echo $AGENT | jq -r .agent.id); AGENT_KEY=$(echo $AGENT | jq -r .agentKey)
+curl -s -X PUT $BASE/api/policies -H "Authorization: Bearer $OWNER_KEY" -H 'Content-Type: application/json' \
+  -d "{\"agentId\":\"$AGENT_ID\",\"policy\":{\"perActionCap\":500,\"windowCap\":600,\"approvalThreshold\":100,\"allowedScopes\":[\"payments\"]}}"
+REQ='{"action":"pay_invoice","cost":450,"scopes":["payments"],"params":{"invoice":"INV-1"}}'
+PID=$(curl -s -X POST $BASE/api/enforce -H "Authorization: Bearer $AGENT_KEY" -H 'Content-Type: application/json' -d "$REQ" | jq -r .pendingActionId)
+curl -s -X POST $BASE/api/approvals -H "Authorization: Bearer $OWNER_KEY" -H 'Content-Type: application/json' -d "{\"actionId\":\"$PID\",\"approve\":true}"
+TOKEN=$(curl -s $BASE/api/actions/$PID -H "Authorization: Bearer $AGENT_KEY" | jq -r .approvalToken)
+curl -s -X POST $BASE/api/enforce -H "Authorization: Bearer $AGENT_KEY" -H 'Content-Type: application/json' \
+  -d "$(echo $REQ | jq --arg t $TOKEN '. + {approvalToken: $t}')"   # 200 released; repeat → 403 replay
 ```
 
-## Policy Configuration
+## TypeScript SDK
 
-### Fields
+```ts
+import { AegisOwner, AegisAgent } from '@/lib/aegisSDK'
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `spendingCap` | number | Maximum total cost per day (blocks actions exceeding this) |
-| `approvalThreshold` | number | Cost requiring human approval (blocks pending approval) |
-| `allowedScopes` | string[] | List of permitted scopes (blocks unlisted scopes) |
+const { owner } = await AegisOwner.create('me', 'https://aegis-mauve-one.vercel.app')
+const { agent, agentKey } = await owner.createAgent('billing-agent')
+await owner.setPolicy(agent.id, { perActionCap: 500, windowCap: 600, approvalThreshold: 100, allowedScopes: ['payments'] })
 
-### Example Presets
-
-#### Read-Only Agent
-```json
-{
-  "spendingCap": 0,
-  "approvalThreshold": 0,
-  "allowedScopes": ["read"]
-}
+const bot = new AegisAgent(agentKey, 'https://aegis-mauve-one.vercel.app')
+const req = { action: 'pay_invoice', cost: 450, scopes: ['payments'], params: { invoice: 'INV-1' } }
+const res = await bot.enforce(req)
+if (res.requiresApproval) await bot.waitAndRelease(req, res.pendingActionId!) // after the owner approves
 ```
 
-#### Productivity Agent
-```json
-{
-  "spendingCap": 100,
-  "approvalThreshold": 50,
-  "allowedScopes": ["read", "write", "query"]
-}
-```
+## Data and security model
 
-#### Financial Operations Agent
-```json
-{
-  "spendingCap": 500,
-  "approvalThreshold": 250,
-  "allowedScopes": ["read", "write", "query", "transfer", "payment"]
-}
-```
+- Postgres schema `aegis`; the app connects as `aegis_app`, which can reach only that schema, cannot bypass row-level security, and has no `UPDATE`/`DELETE` on the decision log. A trigger rejects updates, deletes and truncates on the log for every role.
+- Each request runs in one transaction with `aegis.owner_id` set; RLS policies expose only that owner's rows. Key lookups before an owner is known go through two narrow `SECURITY DEFINER` functions that return ids only.
+- Per-agent advisory locks serialise enforce, release and revoke, so concurrent calls cannot overspend the window or release twice.
+- The Supabase API roles (`anon`, `authenticated`, `service_role`) have no privileges on the schema, and it is not exposed through PostgREST.
 
-#### Unrestricted Agent
-```json
-{
-  "spendingCap": 10000,
-  "approvalThreshold": 5000,
-  "allowedScopes": ["read", "write", "query", "transfer", "payment", "admin"]
-}
-```
+## Not yet
 
-## Enforcement Rules
-
-The enforcement engine checks in this order:
-
-1. **Spending Cap** — if `cost > spendingCap`, returns `BLOCKED` with 403
-2. **Scope Isolation** — if requested scopes not in `allowedScopes`, returns `BLOCKED` with 403
-3. **Approval Threshold** — if `cost > approvalThreshold`, returns `REQUIRES_APPROVAL` with 202
-4. **Otherwise** — returns `ALLOWED` with 200
-
-## JavaScript SDK
-
-Use the included SDK to integrate enforcement into your agents:
-
-```typescript
-import { createAegisAgent } from '@/lib/aegisSDK'
-
-// Create an agent with governance
-const agent = createAegisAgent('user-id', 'agent-id')
-
-// Set policy once
-await agent.setPolicy({
-  spendingCap: 100,
-  approvalThreshold: 50,
-  allowedScopes: ['read', 'write', 'query'],
-})
-
-// Check every action before executing
-const check = await agent.enforce({
-  action: 'expensive_operation',
-  cost: 75,
-  scopes: ['write'],
-})
-
-if (check.allowed) {
-  // Perform the action
-} else if (check.requiresApproval) {
-  // Queue for human approval
-} else {
-  // Reject action, return error to user
-  throw new Error(`Action blocked: ${check.reason}`)
-}
-```
-
-## Testing
-
-Visit the interactive test suite: https://aegis-mauve-one.vercel.app/test
-
-The test page demonstrates:
-- Setting policies
-- Enforcing allowed actions
-- Enforcing actions requiring approval
-- Enforcing blocked actions
-- Checking scope isolation
-
-## Production Deployment
-
-To connect to a real database (Supabase, PostgreSQL, etc.):
-
-1. Replace the in-memory store in `lib/policyStore.ts` with your database
-2. Update `app/api/policies/route.ts` to use your database queries
-3. Update `app/api/enforce/route.ts` to fetch policies from your database
-4. Deploy with your database credentials in environment variables
-
-## Kill Switch
-
-There is no `DELETE /api/policies` endpoint yet. To cut an agent off through this API, overwrite its policy with `spendingCap: 0` and `allowedScopes: []`. Revoking a delegation in the signed-in dashboard does not yet affect this API.
-
-## Compliance & Audit
-
-Every enforcement decision is currently written to server console output only (not persisted) with:
-- Timestamp (ISO 8601)
-- Agent ID (the user ID and the policy that applied are not yet logged)
-- Action requested
-- Decision (ALLOWED / BLOCKED / REQUIRES_APPROVAL)
-- Reason
-
-Persistent, queryable decision logs are planned; until then these logs are not suitable for compliance reporting.
-
-## Next Steps
-
-### Immediate Production Roadmap
-
-1. **Database Persistence** — Replace in-memory store with Supabase for multi-server deployment
-2. **Auth0 Token Vault Integration** — Secure token storage and rotation
-3. **Approval Workflows** — Human-in-the-loop for threshold-triggered actions
-4. **Audit Dashboard** — Real-time compliance monitoring
-5. **SDK Packages** — NPM, PyPI, Go packages for agent frameworks
-6. **Cost Tracking** — Actual spending against policies, not just limits
-
-### Framework Integrations
-
-- **LangChain** — Built-in policy enforcement for chains
-- **AutoGen** — Agent group governance
-- **OpenAI Functions** — Function call validation
-- **Anthropic Batch API** — Cost forecasting and approval
-
-### Marketplace
-
-- Pre-built policies for common frameworks
-- Audit trail analytics
-- Cost forecasting models
-- Cross-agent resource allocation
+External security audit or penetration test; signed receipts and external anchoring of the log; per-key rate limiting on `/api/enforce`; passkey/email login for owners; key rotation; runtime interception for agents that do not call Aegis.
