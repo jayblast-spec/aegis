@@ -2,7 +2,7 @@
 
 ## Overview
 
-Aegis provides a production-grade enforcement backend for AI agent governance. Unlike sandbox demos, this is **real policy enforcement** that agents use to verify compliance before taking actions.
+Aegis provides a prototype policy-check API for AI agent governance. Requests are evaluated server-side against stored rules, but the API is unauthenticated, policies are held in server memory (reset on redeploy, not shared across serverless instances), and agents must choose to call it. Do not rely on it as a security control yet.
 
 Live at: `https://aegis-mauve-one.vercel.app`
 
@@ -224,22 +224,18 @@ To connect to a real database (Supabase, PostgreSQL, etc.):
 
 ## Kill Switch
 
-To immediately revoke an agent's access:
-
-1. Delete the agent's policy via `DELETE /api/policies`
-2. Or set `spendingCap: 0` and `allowedScopes: []` on the policy
+There is no `DELETE /api/policies` endpoint yet. To cut an agent off through this API, overwrite its policy with `spendingCap: 0` and `allowedScopes: []`. Revoking a delegation in the signed-in dashboard does not yet affect this API.
 
 ## Compliance & Audit
 
-Every enforcement decision is logged with:
+Every enforcement decision is currently written to server console output only (not persisted) with:
 - Timestamp (ISO 8601)
-- User ID and Agent ID
+- Agent ID (the user ID and the policy that applied are not yet logged)
 - Action requested
 - Decision (ALLOWED / BLOCKED / REQUIRES_APPROVAL)
 - Reason
-- Policy that applied
 
-Use these logs for compliance reporting, incident investigation, and agent behavior analysis.
+Persistent, queryable decision logs are planned; until then these logs are not suitable for compliance reporting.
 
 ## Next Steps
 
