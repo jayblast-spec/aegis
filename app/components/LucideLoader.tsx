@@ -7,7 +7,7 @@ export default function LucideLoader() {
     <Script
       src="https://unpkg.com/lucide@latest"
       strategy="afterInteractive"
-      onLoad={() => { (window as any).lucide?.createIcons?.() }}
+      onLoad={() => { (window as unknown as { lucide?: { createIcons?: () => void } }).lucide?.createIcons?.() }}
     />
   )
 }

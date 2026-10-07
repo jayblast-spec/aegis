@@ -1,71 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { setPolicy, getPolicy, getAllPolicies } from '@/lib/policyStore'
+import { getDb } from '@/lib/server/db'
+import { bearer, handle, json, readJson } from '@/lib/server/http'
+import { authOwner, getPolicy, listAgents, setPolicy } from '@/lib/server/service'
 
-export async function POST(request: NextRequest) {
-  try {
-    const { userId, agentId, policy } = await request.json()
+export const dynamic = 'force-dynamic'
 
-    if (!userId || !agentId || !policy) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
-    }
-
-    // Store policy
-    const storedPolicy = setPolicy(userId, agentId, policy)
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: `Policy stored for agent ${agentId}`,
-        policy: storedPolicy,
-      },
-      { status: 201 }
-    )
-
-  } catch (error) {
-    console.error('Policy creation error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+async function write(req: Request) {
+  return handle(async () => {
+    const db = getDb()
+    const ownerId = await authOwner(db, bearer(req))
+    const body = await readJson(req)
+    return json(await setPolicy(db, ownerId, body.agentId, body.policy))
+  })
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const userId = request.nextUrl.searchParams.get('userId')
-    const agentId = request.nextUrl.searchParams.get('agentId')
+/** Set or replace an agent's policy. Owner key required; the agent must belong to that owner. */
+export const POST = write
+export const PUT = write
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId required' },
-        { status: 400 }
-      )
-    }
-
-    if (agentId) {
-      // Get specific agent policy
-      const policy = getPolicy(userId, agentId)
-      if (!policy) {
-        return NextResponse.json(
-          { error: 'Policy not found' },
-          { status: 404 }
-        )
-      }
-      return NextResponse.json({ policy }, { status: 200 })
-    }
-
-    // Get all policies for user
-    const policies = getAllPolicies(userId)
-    return NextResponse.json({ policies }, { status: 200 })
-
-  } catch (error) {
-    console.error('Policy retrieval error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+export async function GET(req: Request) {
+  return handle(async () => {
+    const db = getDb()
+    const ownerId = await authOwner(db, bearer(req))
+    const agentId = new URL(req.url).searchParams.get('agentId')
+    if (agentId) return json(await getPolicy(db, ownerId, agentId))
+    const agents = await listAgents(db, ownerId)
+    return json({ policies: agents.map(a => ({ agentId: a.id, agentName: a.name, policy: a.policy })) })
+  })
 }

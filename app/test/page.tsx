@@ -1,138 +1,89 @@
 'use client'
 
 import { useState } from 'react'
-import { createAegisAgent, Policy } from '@/lib/aegisSDK'
+import Link from 'next/link'
+import { AegisAgent, AegisOwner } from '@/lib/aegisSDK'
 
-export default function EnforcementTest() {
-  const [userId] = useState('test-user-001')
-  const [agentId] = useState('claude-agent-001')
-  const [results, setResults] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+type Step = { name: string; expected: string; got: string; pass: boolean }
 
-  const agent = createAegisAgent(userId, agentId)
+const mono = { fontFamily: "'JetBrains Mono', monospace" }
 
-  const runTest = async () => {
-    setLoading(true)
-    const testResults = []
+/**
+ * Live self-test: runs the full enforcement lifecycle against this
+ * deployment's API with a fresh throwaway owner and reports pass/fail.
+ */
+export default function EnforcementSelfTest() {
+  const [steps, setSteps] = useState<Step[]>([])
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-    try {
-      // Step 1: Set a policy
-      console.log('Setting policy...')
-      const policyResponse = await agent.setPolicy({
-        spendingCap: 100,
-        approvalThreshold: 50,
-        allowedScopes: ['read', 'write', 'query'],
-      })
-      testResults.push({
-        step: 'Set Policy',
-        status: 'success',
-        result: policyResponse,
-      })
-
-      // Step 2: Enforce allowed action
-      console.log('Testing allowed action...')
-      const allowedResponse = await agent.enforce({
-        action: 'run_query',
-        cost: 25,
-        scopes: ['read', 'query'],
-      })
-      testResults.push({
-        step: 'Allowed Action ($25)',
-        status: allowedResponse.allowed ? 'success' : 'blocked',
-        result: allowedResponse,
-      })
-
-      // Step 3: Enforce action requiring approval
-      console.log('Testing action requiring approval...')
-      const approvalResponse = await agent.enforce({
-        action: 'write_data',
-        cost: 75,
-        scopes: ['write'],
-      })
-      testResults.push({
-        step: 'Approval Required ($75)',
-        status: approvalResponse.requiresApproval ? 'approval' : 'other',
-        result: approvalResponse,
-      })
-
-      // Step 4: Enforce blocked action (exceeds cap)
-      console.log('Testing blocked action...')
-      const blockedResponse = await agent.enforce({
-        action: 'expensive_operation',
-        cost: 150,
-        scopes: ['read'],
-      })
-      testResults.push({
-        step: 'Blocked Action ($150, exceeds $100 cap)',
-        status: !blockedResponse.allowed ? 'blocked' : 'error',
-        result: blockedResponse,
-      })
-
-      // Step 5: Enforce action with unauthorized scope
-      console.log('Testing unauthorized scope...')
-      const scopeResponse = await agent.enforce({
-        action: 'delete_data',
-        cost: 10,
-        scopes: ['delete'],
-      })
-      testResults.push({
-        step: 'Unauthorized Scope',
-        status: !scopeResponse.allowed ? 'blocked' : 'error',
-        result: scopeResponse,
-      })
-
-    } catch (error) {
-      testResults.push({
-        step: 'Error',
-        status: 'error',
-        result: String(error),
-      })
+  async function run() {
+    setRunning(true)
+    setError(null)
+    const out: Step[] = []
+    const record = (name: string, expected: string, got: string) => {
+      out.push({ name, expected, got, pass: expected === got })
+      setSteps([...out])
     }
+    try {
+      const { owner } = await AegisOwner.create('Self-test')
+      const { agent: a, agentKey } = await owner.createAgent('Self-test agent')
+      const agent = new AegisAgent(agentKey)
+      await owner.setPolicy(a.id, { perActionCap: 500, windowCap: 600, windowSeconds: 3600, approvalThreshold: 100, allowedScopes: ['read', 'payments'] })
 
-    setResults(testResults)
-    setLoading(false)
+      record('$25 read within limits', 'ALLOWED', (await agent.enforce({ action: 'read_report', cost: 25, scopes: ['read'] })).decision.decision)
+      record('Out-of-scope export', 'BLOCKED', (await agent.enforce({ action: 'export_pii', cost: 0, scopes: ['export'] })).decision.decision)
+      record('$900 over per-action cap', 'BLOCKED', (await agent.enforce({ action: 'wire', cost: 900, scopes: ['payments'] })).decision.decision)
+
+      const payment = { action: 'pay_invoice', cost: 450, scopes: ['payments'], params: { invoice: 'INV-1' } }
+      const held = await agent.enforce(payment)
+      record('$450 over approval threshold', 'REQUIRES_APPROVAL', held.decision.decision)
+      await owner.decide(held.pendingActionId!, true)
+      const state = await agent.poll(held.pendingActionId!)
+      record('Altered payload with approval token', 'BLOCKED', (await agent.enforce({ ...payment, cost: 499, approvalToken: state.approvalToken })).decision.decision)
+      record('Exact payload with approval token', 'ALLOWED', (await agent.enforce({ ...payment, approvalToken: state.approvalToken })).decision.decision)
+      record('Replay of the same token', 'BLOCKED', (await agent.enforce({ ...payment, approvalToken: state.approvalToken })).decision.decision)
+      record('$90 more: $25 + $450 + $90 > $600 window', 'BLOCKED', (await agent.enforce({ action: 'small_payment', cost: 90, scopes: ['payments'] })).decision.decision)
+
+      await owner.revoke(a.id)
+      record('Any action after revoke', 'BLOCKED', (await agent.enforce({ action: 'read_report', cost: 0, scopes: ['read'] })).decision.decision)
+
+      const log = await owner.decisions({ limit: 50 })
+      record('Decision log rows written', 'yes', log.length >= 10 ? 'yes' : `only ${log.length}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Self-test failed')
+    } finally {
+      setRunning(false)
+    }
   }
 
+  const passed = steps.filter(s => s.pass).length
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-white mb-8">Aegis Enforcement Backend Test</h1>
-
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-8">
-          <div className="mb-6">
-            <p className="text-slate-300 mb-2"><strong>User ID:</strong> {userId}</p>
-            <p className="text-slate-300 mb-4"><strong>Agent ID:</strong> {agentId}</p>
-            <button
-              onClick={runTest}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold py-3 px-6 rounded-lg transition"
-            >
-              {loading ? 'Running Tests...' : 'Run Full Test Suite'}
-            </button>
-          </div>
-        </div>
-
-        {results.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-white">Test Results</h2>
-            {results.map((result, idx) => (
-              <div key={idx} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-white">{result.step}</h3>
-                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                    result.status === 'success' ? 'bg-green-900 text-green-200' :
-                    result.status === 'blocked' ? 'bg-red-900 text-red-200' :
-                    result.status === 'approval' ? 'bg-yellow-900 text-yellow-200' :
-                    'bg-slate-700 text-slate-200'
-                  }`}>
-                    {result.status.toUpperCase()}
+    <div className="min-h-screen bg-[#07090E] text-gray-100 p-6 sm:p-10">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Link href="/" className="text-xs text-emerald-400 hover:underline" style={mono}>← Aegis</Link>
+        <h1 className="text-3xl font-bold text-white">Enforcement self-test</h1>
+        <p className="text-gray-300 text-sm">
+          Creates a throwaway owner and agent on this deployment, then walks the full lifecycle: allowed, blocked, held for approval, approve and release,
+          substitution and replay refused, rolling-window cap, and revoke. Every step is a real API call.
+        </p>
+        <button onClick={run} disabled={running} className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 text-white font-semibold disabled:opacity-50">
+          {running ? 'Running…' : 'Run self-test'}
+        </button>
+        {error && <p className="text-rose-400 text-sm" role="alert">{error}</p>}
+        {steps.length > 0 && (
+          <div className="rounded-2xl border border-gray-800 overflow-hidden" style={mono}>
+            <div className="px-4 py-3 border-b border-gray-800 text-xs text-gray-400">{passed}/{steps.length} passed</div>
+            <ul className="divide-y divide-gray-800 text-xs">
+              {steps.map(s => (
+                <li key={s.name} className="px-4 py-3 flex flex-wrap justify-between gap-2">
+                  <span className="text-gray-200">{s.name}</span>
+                  <span className={s.pass ? 'text-emerald-400' : 'text-rose-400'}>
+                    {s.pass ? 'PASS' : 'FAIL'} · expected {s.expected}, got {s.got}
                   </span>
-                </div>
-                <pre className="bg-slate-900 text-slate-300 p-3 rounded text-xs overflow-x-auto">
-                  {JSON.stringify(result.result, null, 2)}
-                </pre>
-              </div>
-            ))}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

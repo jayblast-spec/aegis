@@ -1,69 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { getDb } from '@/lib/server/db'
+import { bearer, handle, json, readJson } from '@/lib/server/http'
+import { authOwner, decideApproval, listApprovals } from '@/lib/server/service'
 
-// In-memory approval queue
-const approvalQueue: Record<string, any[]> = {}
+export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest) {
-  try {
-    const { userId, agentId, action, actionId, approved } = await request.json()
-
-    if (!userId || !agentId || actionId === undefined || approved === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
-    }
-
-    // Store approval decision
-    if (!approvalQueue[userId]) {
-      approvalQueue[userId] = []
-    }
-
-    const decision = {
-      actionId,
-      agentId,
-      action,
-      approved,
-      decidedAt: new Date().toISOString(),
-    }
-
-    approvalQueue[userId].push(decision)
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: `Action ${approved ? 'approved' : 'denied'}`,
-        decision,
-      },
-      { status: 201 }
-    )
-  } catch (error) {
-    console.error('Approval error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+/** Owner's approval queue (default: pending only). */
+export async function GET(req: Request) {
+  return handle(async () => {
+    const db = getDb()
+    const ownerId = await authOwner(db, bearer(req))
+    const status = new URL(req.url).searchParams.get('status') ?? 'pending'
+    return json({ actions: await listApprovals(db, ownerId, status) })
+  })
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const userId = request.nextUrl.searchParams.get('userId')
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId required' },
-        { status: 400 }
-      )
-    }
-
-    const decisions = approvalQueue[userId] || []
-    return NextResponse.json({ decisions }, { status: 200 })
-  } catch (error) {
-    console.error('Approval retrieval error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
+/** Owner approves or denies a pending action: { actionId, approve: boolean }. */
+export async function POST(req: Request) {
+  return handle(async () => {
+    const db = getDb()
+    const ownerId = await authOwner(db, bearer(req))
+    const body = await readJson(req)
+    return json({ action: await decideApproval(db, ownerId, body.actionId, body.approve) })
+  })
 }

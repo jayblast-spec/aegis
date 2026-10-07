@@ -2,10 +2,6 @@ import { useEffect } from 'react'
 
 export type ShortcutKey = '?' | 'r' | 'e' | 's'
 
-interface ShortcutHandlers {
-  [key: string]: () => void
-}
-
 export function useKeyboardShortcuts(handlers: Partial<Record<ShortcutKey, () => void>>) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
