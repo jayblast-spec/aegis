@@ -6,7 +6,7 @@ An owner sets limits for each agent once. Each agent authenticates with its own 
 
 **Stage:** early build. Not externally audited. Aegis is a checkpoint, not an interceptor: an agent that never calls it, or ignores a `403`, is not stopped.
 
-Base URL: `https://aegis-mauve-one.vercel.app`. All bodies are JSON (max 16 KB). All responses carry `Cache-Control: no-store`. Errors are `{ "error": string, "code": string }`.
+Base URL: `https://aegistrust.digital`. All bodies are JSON (max 16 KB). All responses carry `Cache-Control: no-store`. Errors are `{ "error": string, "code": string }`.
 
 ## Authentication
 
@@ -109,7 +109,7 @@ Newest-first decision log: `eventType` (`enforce`, `release`, `approve`, `deny`,
 ## End-to-end with curl
 
 ```bash
-BASE=https://aegis-mauve-one.vercel.app
+BASE=https://aegistrust.digital
 OWNER_KEY=$(curl -s -X POST $BASE/api/owners -H 'Content-Type: application/json' -d '{}' | jq -r .ownerKey)
 AGENT=$(curl -s -X POST $BASE/api/agents -H "Authorization: Bearer $OWNER_KEY" -H 'Content-Type: application/json' -d '{"name":"demo"}')
 AGENT_ID=$(echo $AGENT | jq -r .agent.id); AGENT_KEY=$(echo $AGENT | jq -r .agentKey)
@@ -128,11 +128,11 @@ curl -s -X POST $BASE/api/enforce -H "Authorization: Bearer $AGENT_KEY" -H 'Cont
 ```ts
 import { AegisOwner, AegisAgent } from '@/lib/aegisSDK'
 
-const { owner } = await AegisOwner.create('me', 'https://aegis-mauve-one.vercel.app')
+const { owner } = await AegisOwner.create('me', 'https://aegistrust.digital')
 const { agent, agentKey } = await owner.createAgent('billing-agent')
 await owner.setPolicy(agent.id, { perActionCap: 500, windowCap: 600, approvalThreshold: 100, allowedScopes: ['payments'] })
 
-const bot = new AegisAgent(agentKey, 'https://aegis-mauve-one.vercel.app')
+const bot = new AegisAgent(agentKey, 'https://aegistrust.digital')
 const req = { action: 'pay_invoice', cost: 450, scopes: ['payments'], params: { invoice: 'INV-1' } }
 const res = await bot.enforce(req)
 if (res.requiresApproval) await bot.waitAndRelease(req, res.pendingActionId!) // after the owner approves

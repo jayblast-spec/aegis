@@ -9,7 +9,7 @@
 Aegis explores one premise: as AI agents gain the ability to read, decide, and act across a person's digital life, their authority should stay visible, bounded, portable, and revocable by the person they represent. Today it is an early build: a person sets limits once, and an authenticated enforcement API answers allowed, held for human approval, or blocked for every agent action, with one-click revoke and a durable decision log.
 
 <p>
-  <a href="https://aegis-mauve-one.vercel.app"><img alt="Live Demo" src="https://img.shields.io/badge/Live-Demo-1D4ED8?style=for-the-badge&logo=vercel&logoColor=white"></a>
+  <a href="https://aegistrust.digital"><img alt="Live Demo" src="https://img.shields.io/badge/Live-Demo-1D4ED8?style=for-the-badge&logo=vercel&logoColor=white"></a>
   <a href="https://github.com/jayblast-spec/aegis"><img alt="GitHub Repo" src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white"></a>
 </p>
 
@@ -36,7 +36,7 @@ A person sets limits for each AI agent once: a per-action spending cap, a rollin
 - `202 REQUIRES_APPROVAL`: held. A pending action is queued for the owner and expires if nobody decides.
 - `403 BLOCKED`: over a cap, outside the allowed scopes, no policy set (fail closed), or the agent was revoked.
 
-The owner approves or denies held actions in the [owner console](https://aegis-mauve-one.vercel.app/console) or through the API. Approval does not unblock anything by itself: the agent polls the held action, receives a single-use token bound to the SHA-256 hash of that exact request, and resubmits the identical request with the token. A different amount, recipient, scope set or agent is refused, and a second use of the token is refused. One click revokes an agent's key (or all of an owner's agents) and the very next enforcement call is blocked. Every decision, approval, denial, expiry and revoke is written to an append-only decision log with the actor and a server timestamp.
+The owner approves or denies held actions in the [owner console](https://aegistrust.digital/console) or through the API. Approval does not unblock anything by itself: the agent polls the held action, receives a single-use token bound to the SHA-256 hash of that exact request, and resubmits the identical request with the token. A different amount, recipient, scope set or agent is refused, and a second use of the token is refused. One click revokes an agent's key (or all of an owner's agents) and the very next enforcement call is blocked. Every decision, approval, denial, expiry and revoke is written to an append-only decision log with the actor and a server timestamp.
 
 The repository also contains:
 
@@ -93,7 +93,7 @@ Integration tests run the real route handlers against real Postgres (PGlite, in-
 ## Using the API
 
 ```bash
-BASE=https://aegis-mauve-one.vercel.app
+BASE=https://aegistrust.digital
 
 # 1. Owner account (the key is shown once)
 curl -s -X POST $BASE/api/owners -H 'Content-Type: application/json' -d '{"label":"me"}'
@@ -116,6 +116,8 @@ npm run dev
 
 The enforcement API needs `AEGIS_DATABASE_URL`: a Postgres connection string for the `aegis_app` role after applying the migration in `supabase/migrations/`. Optional: `AEGIS_PENDING_TTL_SECONDS` (default 900), `AEGIS_RELEASE_TTL_SECONDS` (600), `AEGIS_OWNER_SIGNUPS_PER_HOUR` (10 per network), `AEGIS_IP_SALT`, and `AEGIS_DATABASE_CA` (the PEM of your Postgres provider's root CA, needed for Supabase's pooler so TLS verification stays on). Without a database the API returns `503 not_configured`; it never falls back to in-memory state.
 
+Set `AEGIS_IP_SALT` to a long random value in any deployment. It salts the hash stored in place of client IP addresses; without it a fixed development default is used.
+
 ## Architecture Direction
 
 1. User-held keys and passkey-backed identity
@@ -129,7 +131,7 @@ Aegis sits beside — not in place of — developer-facing authorization platfor
 
 ## Live
 
-[aegis-mauve-one.vercel.app](https://aegis-mauve-one.vercel.app) · [owner console](https://aegis-mauve-one.vercel.app/console) · [self-test](https://aegis-mauve-one.vercel.app/test)
+[aegistrust.digital](https://aegistrust.digital) · [owner console](https://aegistrust.digital/console) · [self-test](https://aegistrust.digital/test)
 
 ## Tech Stack
 
@@ -146,7 +148,9 @@ Aegis sits beside — not in place of — developer-facing authorization platfor
 
 ## License
 
-Proprietary. All rights reserved.
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The licence covers the code in this repository. It does not grant rights to the Aegis or ArkNet Digital names and marks.
 
 <p align="center">
   <img alt="ArkNet Digital footer" src="https://capsule-render.vercel.app/api?type=waving&height=120&color=0:1D4ED8,55:0B1E3D,100:020617&section=footer&text=ArkNet%20Digital&fontColor=FFFFFF&fontSize=24&fontAlign=50&fontAlignY=65&desc=michael@arknet.digital&descAlign=50&descAlignY=85">
