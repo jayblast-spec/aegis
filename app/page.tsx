@@ -374,36 +374,23 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="lg:col-span-5 relative flex items-center justify-center">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.8 }}
-                  className="relative w-full aspect-square rounded-3xl overflow-hidden"
-                  style={{ background: 'radial-gradient(circle at 30% 20%, rgba(6,182,212,.2), rgba(59,130,246,.1))', boxShadow: '0 0 60px rgba(6,182,212,.3)' }}
-                >
-                  {/* Animated shield visual */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <motion.div
-                      animate={{ scale: [1, 1.02, 1], rotate: 360 }}
-                      transition={{ duration: 20, repeat: Infinity }}
-                      className="relative"
-                    >
-                      <svg width="280" height="280" viewBox="0 0 280 280" className="drop-shadow-lg" style={{ filter: 'drop-shadow(0 0 30px rgba(6,182,212,.6))' }}>
-                        <defs>
-                          <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="rgba(6,182,212,.8)" />
-                            <stop offset="100%" stopColor="rgba(59,130,246,.6)" />
-                          </linearGradient>
-                        </defs>
-                        <path d="M140,20 L60,60 L60,140 Q60,200 140,240 Q220,200 220,140 L220,60 Z" fill="url(#shieldGradient)" stroke="rgba(6,182,212,.6)" strokeWidth="2" />
-                        <circle cx="140" cy="130" r="50" fill="none" stroke="rgba(6,182,212,.8)" strokeWidth="2" />
-                        <circle cx="140" cy="130" r="30" fill="rgba(6,182,212,.1)" />
-                        <text x="140" y="140" textAnchor="middle" fontSize="24" fill="rgba(6,182,212,.9)" fontWeight="bold">AI</text>
-                      </svg>
-                    </motion.div>
-                  </div>
-                </motion.div>
+              <div className="lg:col-span-5 relative flex items-center justify-center min-h-[360px]">
+                {/* Ambient glow behind the emblem */}
+                <div className="absolute w-[460px] h-[460px] max-w-full bg-emerald-500/15 blur-[120px] rounded-full pointer-events-none" />
+                <div className="absolute w-[360px] h-[360px] max-w-full bg-cyan-500/15 blur-[100px] rounded-full pointer-events-none" />
+                {/* Guardian shield — the trust & delegation layer for AI agents */}
+                <motion.img
+                  src="/aegis-guardian-hero.png"
+                  alt="Aegis — a portable trust and delegation shield for AI agents"
+                  initial={{ opacity: 0, scale: 0.92, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: [0, -10, 0] }}
+                  transition={{
+                    opacity: { duration: 0.8 },
+                    scale: { duration: 0.8 },
+                    y: { duration: 6, repeat: Infinity, ease: 'easeInOut' },
+                  }}
+                  className="relative w-[280px] sm:w-[340px] lg:w-[400px] h-auto drop-shadow-[0_0_45px_rgba(6,182,212,0.35)]"
+                />
               </div>
             </div>
           </div>
