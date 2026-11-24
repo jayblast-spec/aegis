@@ -1,7 +1,7 @@
 {
- "base": "http://localhost:3518",
- "total": 8,
- "passed": 8,
+ "base": "http://localhost:3519",
+ "total": 13,
+ "passed": 13,
  "failed": 0,
  "results": [
   {
@@ -51,6 +51,36 @@
    "severity": "critical",
    "pass": true,
    "detail": "allowed $90 total across 2 calls under a $100 cap"
+  },
+  {
+   "name": "control: over-threshold action REQUIRES_APPROVAL before any approval",
+   "severity": "control",
+   "pass": true,
+   "detail": "got REQUIRES_APPROVAL"
+  },
+  {
+   "name": "control: approved exact request is ALLOWED",
+   "severity": "control",
+   "pass": true,
+   "detail": "got ALLOWED"
+  },
+  {
+   "name": "attack: approval cannot be replayed (single-use)",
+   "severity": "critical",
+   "pass": true,
+   "detail": "2nd use got REQUIRES_APPROVAL"
+  },
+  {
+   "name": "attack: altered cost cannot reuse an approval",
+   "severity": "critical",
+   "pass": true,
+   "detail": "cost 60 approved, cost 90 got REQUIRES_APPROVAL"
+  },
+  {
+   "name": "attack: altered action cannot reuse an approval",
+   "severity": "critical",
+   "pass": true,
+   "detail": "approved wire_funds, drain_funds got REQUIRES_APPROVAL"
   }
  ]
 }

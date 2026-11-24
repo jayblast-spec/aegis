@@ -53,6 +53,36 @@ for (let i = 0; i < 8; i++) {
 }
 check("attack: split actions cannot exceed daily cap", "critical", allowedSpend <= CAP, `allowed $${allowedSpend} total across ${calls} calls under a $${CAP} cap`);
 
+// ---- Round 2: approval binding, altered-params, replay ----
+// Generous cap so these turn on the approval path, not the cap.
+const AP_USER = `${USER}-appr`;
+await post("/api/policies", { userId: AP_USER, agentId: AGENT, policy: { spendingCap: 10000, approvalThreshold: 50, allowedScopes: SCOPES } });
+const enforceAp = (extra) => post("/api/enforce", { userId: AP_USER, agentId: AGENT, action: "wire_funds", cost: 60, scopes: ["write"], ...extra });
+const approveAp = (extra) => post("/api/approvals", { userId: AP_USER, agentId: AGENT, action: "wire_funds", cost: 60, scopes: ["write"], approved: true, ...extra });
+
+// Baseline: an over-threshold action needs approval.
+r = await enforceAp();
+check("control: over-threshold action REQUIRES_APPROVAL before any approval", "control", r.decision === "REQUIRES_APPROVAL", `got ${r.decision}`);
+
+// Happy path: human approves the exact request, agent retries -> ALLOWED.
+await approveAp();
+r = await enforceAp();
+check("control: approved exact request is ALLOWED", "control", r.decision === "ALLOWED", `got ${r.decision}`);
+
+// 4. Replay: the just-consumed approval must not work a second time.
+r = await enforceAp();
+check("attack: approval cannot be replayed (single-use)", "critical", r.decision !== "ALLOWED", `2nd use got ${r.decision}`);
+
+// 5. Altered parameters: approve cost 60, then present cost 90 -> must NOT ride the approval.
+await approveAp();
+r = await enforceAp({ cost: 90 });
+check("attack: altered cost cannot reuse an approval", "critical", r.decision !== "ALLOWED", `cost 60 approved, cost 90 got ${r.decision}`);
+
+// 6. Altered action name: approve wire_funds, present drain_funds at same cost -> not allowed.
+await approveAp();
+r = await enforceAp({ action: "drain_funds" });
+check("attack: altered action cannot reuse an approval", "critical", r.decision !== "ALLOWED", `approved wire_funds, drain_funds got ${r.decision}`);
+
 const passed = results.filter(r => r.pass).length;
 const failed = results.filter(r => !r.pass);
 console.log(JSON.stringify({ base: BASE, total: results.length, passed, failed: failed.length, results }, null, 1));

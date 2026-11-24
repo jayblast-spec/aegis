@@ -1,5 +1,6 @@
 // Pure enforcement decision logic — no I/O, so it can be unit-tested and red-teamed directly.
 // The route layer supplies the policy and the agent's spend-so-far; this function decides.
+import { createHash } from 'crypto'
 
 export interface Policy {
   spendingCap: number        // maximum cumulative cost per day
@@ -72,4 +73,25 @@ export function decide(policy: Policy, input: EnforceInput, spentToday: number):
   }
 
   return { kind: 'ALLOWED', status: 200, reason: 'Within policy limits', cost }
+}
+
+// Deterministic hash binding an approval to the EXACT request: same user, agent, action,
+// validated cost and (order-independent) scopes. Any change to any of these yields a different
+// hash, so an approval for one request cannot be reused for a different one. Pure and testable.
+export interface HashableRequest {
+  userId: string
+  agentId: string
+  action: string
+  cost: number
+  scopes?: string[]
+}
+export function requestHash(r: HashableRequest): string {
+  const canonical = JSON.stringify({
+    u: r.userId,
+    a: r.agentId,
+    act: r.action,
+    c: r.cost,
+    s: [...(r.scopes || [])].map(String).sort(),
+  })
+  return createHash('sha256').update(canonical).digest('hex')
 }

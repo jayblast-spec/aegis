@@ -70,6 +70,31 @@ Audit trail verified live: a legit action and a blocked negative-cost attack bot
   mirrored to a durable, shared backend (Supabase: an append-only table with no UPDATE/DELETE
   grants for the audit log) so they survive restarts and are consistent across serverless
   instances. Interfaces are in place for that wiring.
-- Round 2 scope: bind approvals to a hash of the exact `(agentId, action, cost, scopes)`, make them
-  single-use, and have `/api/enforce` consume them — closing altered-parameter and token-replay
-  attacks. Then re-run an expanded harness.
+## Round 2 — approval binding (done 2026-11-24)
+
+Closes the two weaknesses Round 1 left open. Approvals are now bound to a SHA-256 hash of the exact
+request `(userId, agentId, action, validated cost, sorted scopes)` and are single-use; `/api/enforce`
+consumes a matching approval when an action needs one.
+
+- `lib/enforce.ts` → `requestHash()` — deterministic, order-independent binding.
+- `lib/approvalStore.ts` → `recordApproval` / `consumeApproval` (single-use) / `peekApproval`.
+- `app/api/approvals/route.ts` — a human approves one exact request; `GET ?hash=` inspects status.
+- `app/api/enforce/route.ts` — on REQUIRES_APPROVAL, consumes a matching unused approval → ALLOWED;
+  no match (altered params) or already used (replay) stays REQUIRES_APPROVAL.
+
+New attacks added to the harness, all passing:
+
+| Severity | Attack | Result |
+|----------|--------|--------|
+| Critical | Replay a consumed approval | 2nd use → REQUIRES_APPROVAL (not ALLOWED) |
+| Critical | Approve cost $60, present $90 | REQUIRES_APPROVAL (altered cost can't ride it) |
+| Critical | Approve `wire_funds`, present `drain_funds` | REQUIRES_APPROVAL (altered action can't ride it) |
+
+**Harness: 13/13 passed** (`scripts/redteam-results.json`). tsc + build clean.
+
+## Still open (future rounds)
+
+- Durable, shared storage for the policy, spend ledger, approvals and audit log (Supabase; audit as
+  an append-only table with no UPDATE/DELETE grants). Interfaces are in place.
+- Approval expiry/TTL, and binding to a nonce so two identical legitimate requests each need their
+  own approval rather than one covering both.
