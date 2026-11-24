@@ -1,0 +1,56 @@
+{
+ "base": "http://localhost:3518",
+ "total": 8,
+ "passed": 8,
+ "failed": 0,
+ "results": [
+  {
+   "name": "control: legit action under cap+threshold is ALLOWED",
+   "severity": "control",
+   "pass": true,
+   "detail": "got ALLOWED"
+  },
+  {
+   "name": "control: cost over cap is BLOCKED",
+   "severity": "control",
+   "pass": true,
+   "detail": "got BLOCKED"
+  },
+  {
+   "name": "control: cost over threshold REQUIRES_APPROVAL",
+   "severity": "control",
+   "pass": true,
+   "detail": "got REQUIRES_APPROVAL"
+  },
+  {
+   "name": "control: unauthorized scope is BLOCKED",
+   "severity": "control",
+   "pass": true,
+   "detail": "got BLOCKED"
+  },
+  {
+   "name": "control: unknown agent fails closed (403)",
+   "severity": "control",
+   "pass": true,
+   "detail": "got 403"
+  },
+  {
+   "name": "attack: negative cost rejected (not ALLOWED)",
+   "severity": "critical",
+   "pass": true,
+   "detail": "got BLOCKED on cost -500"
+  },
+  {
+   "name": "attack: non-numeric cost rejected (not ALLOWED)",
+   "severity": "high",
+   "pass": true,
+   "detail": "got BLOCKED on cost \"lots\""
+  },
+  {
+   "name": "attack: split actions cannot exceed daily cap",
+   "severity": "critical",
+   "pass": true,
+   "detail": "allowed $90 total across 2 calls under a $100 cap"
+  }
+ ]
+}
